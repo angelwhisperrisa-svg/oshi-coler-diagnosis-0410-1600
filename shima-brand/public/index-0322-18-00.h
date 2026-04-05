@@ -1,0 +1,498 @@
+クラウド　0322 12:52
+
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@300;400;500;700&family=Shippori+Mincho:wght@400;600;800&display=swap" rel="stylesheet">
+<title>推し活💖推し色占い｜あなたの推し色、見つかる。</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #e2dbe2;
+    color: #333333;
+    font-family: 'Zen Maru Gothic', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .container {
+    background: #ffffffcc;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+    position: relative; z-index: 1;
+    max-width: 600px; margin: 0 auto;
+    padding: 48px 28px 88px;
+  }
+
+  .header { text-align: center; margin-bottom: 48px; animation: fadeDown 0.8s ease both; }
+  .header .sub { font-size: 11px; letter-spacing: 2px; color: #5a4a85; text-transform: uppercase; margin-bottom: 16px; }
+  .header h1 {
+    font-family: 'Shippori Mincho', serif;
+    font-size: clamp(28px, 8vw, 44px); font-weight: 700;
+    background: linear-gradient(135deg, #f472b6 0%, #e879f9 40%, #c084fc 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    line-height: 1.3; margin-bottom: 16px;
+  }
+  .header .desc { font-size: 13px; color: #6B5B95; line-height: 1.8; }
+
+  .progress-wrap { margin-bottom: 32px; animation: fadeIn 0.6s ease both 0.3s; }
+  .progress-label { display: flex; justify-content: space-between; font-size: 11px; color: #6B5B95; margin-bottom: 8px; letter-spacing: 1px; }
+  .progress-bar { height: 3px; background: rgba(0,0,0,0.08); border-radius: 99px; overflow: hidden; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, #f472b6, #c084fc); border-radius: 99px; transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+
+  .card { background: white; border: 1px solid rgba(200,180,220,0.2); border-radius: 20px; padding: 36px 32px; animation: slideUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) both; }
+  .question-num { font-size: 11px; letter-spacing: 3px; color: #c084fc; margin-bottom: 16px; }
+  .question-text { font-family: 'Shippori Mincho', serif; font-size: clamp(17px, 4vw, 21px); font-weight: 600; line-height: 1.7; margin-bottom: 32px; color: #222222; }
+
+  .choices { display: flex; flex-direction: column; gap: 12px; }
+  .choice-btn {
+    background: #faf7fd; border: 1px solid rgba(192,132,252,0.25); border-radius: 14px;
+    padding: 16px 20px; color: #444444; font-family: 'Zen Maru Gothic', sans-serif;
+    font-size: 14px; cursor: pointer; text-align: left; transition: all 0.25s ease;
+    display: flex; align-items: center; gap: 14px; line-height: 1.5;
+  }
+  .choice-btn:hover { background: rgba(232,180,232,0.15); border-color: rgba(232,130,232,0.5); transform: translateX(4px); }
+  .choice-btn.selected { background: rgba(232,180,232,0.25); border-color: rgba(200,100,220,0.6); color: #5a1a6a; }
+  .choice-icon { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; background: rgba(240,220,255,0.5); }
+
+  .result-screen { display: none; animation: fadeIn 0.8s ease both; }
+  .result-screen.show { display: block; }
+  .result-color-display { width: 120px; height: 120px; border-radius: 50%; margin: 0 auto 28px; animation: pulse 2s ease infinite; }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 30px var(--result-color, #e8b4e8), 0 0 60px rgba(232,180,232,0.2); }
+    50%       { box-shadow: 0 0 50px var(--result-color, #e8b4e8), 0 0 100px rgba(232,180,232,0.3); }
+  }
+  .result-card { background: white; border: 1px solid rgba(200,180,220,0.2); border-radius: 24px; padding: 40px 32px; text-align: center; }
+  .result-label { font-size: 11px; letter-spacing: 4px; color: #c084fc; margin-bottom: 12px; }
+  .result-color-name { font-family: 'Shippori Mincho', serif; font-size: clamp(26px, 7vw, 36px); font-weight: 800; margin-bottom: 8px; line-height: 1.2; }
+  .result-color-sub { font-size: 13px; color: #888888; margin-bottom: 28px; letter-spacing: 2px; }
+  .result-divider { width: 40px; height: 1px; background: linear-gradient(90deg, transparent, rgba(192,132,252,0.4), transparent); margin: 0 auto 28px; }
+  .result-desc { font-size: 14px; line-height: 2; color: #6b6680; margin-bottom: 28px; text-align: left; }
+  .result-tags { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 32px; }
+  .tag { padding: 6px 14px; border-radius: 99px; font-size: 12px; letter-spacing: 1px; border: 1px solid rgba(192,132,252,0.3); background: rgba(240,220,255,0.3); color: #7a5a9a; }
+  .result-oshi { background: rgba(240,220,255,0.2); border-radius: 14px; padding: 20px; margin-bottom: 28px; border: 1px solid rgba(192,132,252,0.2); text-align: left; }
+  .result-oshi-label { font-size: 11px; letter-spacing: 2px; color: #b47ad4; margin-bottom: 8px; }
+  .result-oshi-text { font-size: 14px; line-height: 1.8; color: #7b7294; }
+
+  .line-section { margin-top: 28px; padding-top: 24px; border-top: 1px solid rgba(192,132,252,0.15); }
+  .line-section-label { font-size: 11px; letter-spacing: 3px; color: #b47ad4; margin-bottom: 16px; text-align: center; }
+  .delivery-tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+  .delivery-tab {
+    flex: 1; padding: 11px 8px; background: #f5f0fb;
+    border: 1px solid rgba(192,132,252,0.2); border-radius: 10px;
+    color: #999; font-family: 'Zen Maru Gothic', sans-serif; font-size: 13px; cursor: pointer;
+    transition: all 0.2s ease; letter-spacing: 1px;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .delivery-tab.active { background: rgba(180,212,232,0.2); border-color: rgba(180,212,232,0.6); color: #5a8aaa; }
+  .delivery-panel { display: none; }
+  .delivery-panel.show { display: block; animation: fadeInUp 0.3s ease both; }
+  @keyframes fadeInUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  .line-result-btn {
+    width: 100%; padding: 18px;
+    background: linear-gradient(135deg, rgba(6,199,85,0.18), rgba(6,199,85,0.08));
+    border: 1px solid rgba(6,199,85,0.35); border-radius: 14px; color: #2a9a50;
+    font-family: 'Zen Maru Gothic', sans-serif; font-size: 15px; font-weight: 500;
+    letter-spacing: 1px; cursor: pointer; transition: all 0.25s ease;
+    display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 10px;
+  }
+  .line-result-btn:hover { background: linear-gradient(135deg, rgba(6,199,85,0.3), rgba(6,199,85,0.15)); transform: translateY(-2px); box-shadow: 0 8px 20px rgba(6,199,85,0.2); }
+  .line-icon { width: 24px; height: 24px; background: #06C755; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: bold; color: white; flex-shrink: 0; }
+
+  .mail-form { display: flex; flex-direction: column; gap: 10px; }
+  .mail-input-row { display: flex; gap: 8px; align-items: center; }
+  .delivery-input { flex: 1; background: white; border: 1px solid rgba(192,132,252,0.3); border-radius: 12px; padding: 14px 16px; color: #333; font-family: 'Zen Maru Gothic', sans-serif; font-size: 14px; outline: none; transition: border-color 0.2s ease; }
+  .delivery-input::placeholder { color: #bbb; }
+  .delivery-input:focus { border-color: rgba(192,132,252,0.6); box-shadow: 0 0 0 3px rgba(192,132,252,0.08); }
+  .mail-send-btn { padding: 14px 18px; background: linear-gradient(135deg, rgba(192,132,252,0.25), rgba(232,180,232,0.25)); border: 1px solid rgba(192,132,252,0.4); border-radius: 12px; color: #7a5a9a; font-family: 'Zen Maru Gothic', sans-serif; font-size: 13px; cursor: pointer; transition: all 0.25s ease; white-space: nowrap; letter-spacing: 1px; flex-shrink: 0; }
+  .mail-send-btn:hover { background: linear-gradient(135deg, rgba(192,132,252,0.4), rgba(232,180,232,0.4)); transform: translateY(-1px); }
+  .mail-send-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+  .mail-success { display: none; text-align: center; padding: 20px; animation: fadeInUp 0.4s ease both; }
+  .mail-success.show { display: block; }
+  .success-icon { font-size: 28px; margin-bottom: 8px; }
+  .success-text { font-size: 13px; color: #7aaa7a; line-height: 1.8; letter-spacing: 0.5px; }
+  .delivery-note { font-size: 11px; color: #aaa; line-height: 1.7; letter-spacing: 0.5px; text-align: center; }
+
+  .retry-btn {
+    background: linear-gradient(135deg, rgba(232,180,232,0.2), rgba(180,212,232,0.2));
+    border: 1px solid rgba(192,132,252,0.3); border-radius: 14px;
+    padding: 16px 36px; color: #7a5a9a; font-family: 'Zen Maru Gothic', sans-serif;
+    font-size: 14px; cursor: pointer; letter-spacing: 2px; transition: all 0.3s ease; width: 100%; margin-top: 16px;
+  }
+  .retry-btn:hover { background: linear-gradient(135deg, rgba(232,180,232,0.35), rgba(180,212,232,0.35)); transform: translateY(-2px); }
+
+  .start-screen { text-align: center; }
+  .start-visual { width: 140px; height: 140px; margin: 0 auto 32px; position: relative; }
+  .start-visual .orb { width: 150%; height: 150%; border-radius: 50%; background: radial-gradient(circle at 30% 30%, #f3b5d7 0%, #bfa7c3 40%, #b490d8 100%); filter: brightness(1.05) saturate(1.1); }
+  
+  .start-visual::after {
+    content: '✦'; position: absolute; top: 70%; left: 70%; transform: translate(-50%, -50%);
+    font-size: 52px; background: linear-gradient(135deg, #f2cb54, #c0a377);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    animation: sparkle 4.5s infinite ease-in-out;
+  }
+  @keyframes sparkle {
+    0%, 100% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.7; }
+    50%       { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+  }
+  .start-btn {
+    appearance: none; -webkit-appearance: none;
+    background: linear-gradient(135deg, #e8a0c8, #c084fc);
+    border: none; border-radius: 999px; padding: 18px 52px; color: white;
+    font-family: 'Shippori Mincho', serif; font-size: 16px; font-weight: 700;
+    cursor: pointer; letter-spacing: 3px; transition: all 0.3s ease; margin-top: 32px;
+    box-shadow: 0 6px 20px rgba(192,132,252,0.35);
+  }
+  .start-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(192,132,252,0.45); opacity: 0.95; }
+  .floating-note { font-size: 12px; color: #999999; margin-top: 16px; letter-spacing: 1px; }
+
+  @keyframes fadeDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes fadeIn   { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes slideUp  { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <div class="sub">✦ Color Diagnosis ✦</div>
+    <h1>推し活💜推し色占い</h1>
+    <p class="desc">あなたの内側に宿る色が、<br>あなたにふさわしい推し色を教えてくれる。</p>
+  </div>
+
+  <div id="startScreen" class="start-screen">
+    <div class="card">
+      <div class="start-visual"><div class="orb"></div></div>
+      <p style="font-size:14px; line-height:2.2; color:#555555; margin-bottom:10px;">
+        <br>
+        <br>
+        
+        7つの質問に答えるだけで、<br>
+        あなただけの「推し色」が見つかります。<br>
+        色には感情がある。<br>
+        あなたはどの色に選ばれるのでしょう。
+      </p>
+      <button class="start-btn" onclick="startQuiz()">診断スタート</button>
+      <p class="floating-note">全7問・約1分</p>
+    </div>
+  </div>
+
+  <div id="quizScreen" style="display:none;">
+    <div class="progress-wrap">
+      <div class="progress-label">
+        <span id="progressText">Q1 / 7</span>
+        <span id="progressPct">0%</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill" style="width:0%"></div>
+      </div>
+    </div>
+    <div class="card" id="questionCard">
+      <div class="question-num" id="questionNum">QUESTION 01</div>
+      <div class="question-text" id="questionText"></div>
+      <div class="choices" id="choices"></div>
+    </div>
+  </div>
+
+  <div id="resultScreen" class="result-screen">
+    <div class="result-card">
+      <div class="result-label">YOUR OSHI COLOR</div>
+      <div class="result-color-display" id="resultColorDisplay"></div>
+      <div class="result-color-name" id="resultColorName"></div>
+      <div class="result-color-sub" id="resultColorSub"></div>
+      <div class="result-divider"></div>
+      <div class="result-desc" id="resultDesc"></div>
+      <div class="result-tags" id="resultTags"></div>
+      <div class="result-oshi">
+        <div class="result-oshi-label">✦ あなたの推しへのメッセージ</div>
+        <div class="result-oshi-text" id="resultOshi"></div>
+      </div>
+
+      <div class="line-section">
+        <div class="line-section-label">✦ 結果をあとで見返す ✦</div>
+        <div class="delivery-tabs">
+          <button class="delivery-tab active" onclick="switchTab('line', this)">💚 LINE</button>
+          <button class="delivery-tab" onclick="switchTab('mail', this)">✉️ メール</button>
+        </div>
+        <div class="delivery-panel show" id="panel-line">
+          <button class="line-result-btn" onclick="openLine()">
+            <span class="line-icon">L</span>
+            LINE公式アカウントで受け取る
+          </button>
+          <p class="delivery-note">
+            ※ ボタンを押すとLINE公式アカウントへ移動します。<br>
+            友だち追加後、自動で結果が届きます。
+          </p>
+        </div>
+        <div class="delivery-panel" id="panel-mail">
+          <div id="mailForm" class="mail-form">
+            <div class="mail-input-row">
+              <input class="delivery-input" type="email" id="mailInput" placeholder="メールアドレスを入力" oninput="validateMail()" />
+              <button class="mail-send-btn" id="mailSendBtn" onclick="sendMail()" disabled>送る</button>
+            </div>
+            <p class="delivery-note">
+              ※ 入力したアドレスに結果をお送りします。<br>
+              迷惑メールフォルダもご確認ください。
+            </p>
+          </div>
+          <div class="mail-success" id="mailSuccess">
+            <div class="success-icon">✨</div>
+            <div class="success-text">送信しました！<br>メールをご確認ください💌</div>
+          </div>
+        </div>
+      </div>
+
+      <button class="retry-btn" onclick="resetQuiz()">もう一度占う</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const questions = [
+  {
+    text: "夜、ひとりでいるとき、自然と何をしていることが多い？",
+    choices: [
+      { icon: "🎵", text: "音楽を聴きながら、ぼーっとしている", scores: { lavender: 2, skyblue: 1 } },
+      { icon: "📖", text: "本や漫画を読んでいる",               scores: { ivory: 2, mint: 1 } },
+      { icon: "✨", text: "推しのことを考えて妄想している",     scores: { rose: 2, lavender: 1 } },
+      { icon: "📱", text: "SNSで好きなものを集めている",        scores: { skyblue: 2, mint: 1 } }
+    ]
+  },
+  {
+    text: "推しを見ているとき、胸の中に来るのはどんな感覚？",
+    choices: [
+      { icon: "🌸", text: "あたたかくて、泣きそうになる",   scores: { rose: 2, ivory: 1 } },
+      { icon: "⚡", text: "興奮して、全力で応援したくなる", scores: { mint: 2, skyblue: 1 } },
+      { icon: "🌙", text: "静かに、でも確かに満たされる",   scores: { lavender: 2, ivory: 1 } },
+      { icon: "💫", text: "自分も輝けるような気がしてくる", scores: { skyblue: 2, rose: 1 } }
+    ]
+  },
+  {
+    text: "選ぶとしたら、どんな空間が好き？",
+    choices: [
+      { icon: "🕯️", text: "間接照明のやわらかい、静かな部屋",         scores: { lavender: 2, ivory: 1 } },
+      { icon: "🌿", text: "植物があって、光が差し込む場所",           scores: { mint: 2, ivory: 1 } },
+      { icon: "🌆", text: "夜景が見える、少し非日常な場所",           scores: { skyblue: 2, lavender: 1 } },
+      { icon: "🌸", text: "花や好きなものに囲まれた、自分だけの空間", scores: { rose: 2, mint: 1 } }
+    ]
+  },
+  {
+    text: "推しへの気持ちを一言で表すなら？",
+    choices: [
+      { icon: "💜", text: "「いてくれるだけでいい」",   scores: { lavender: 3 } },
+      { icon: "💙", text: "「どこまでも追いかけたい」", scores: { skyblue: 3 } },
+      { icon: "💚", text: "「一緒に成長していきたい」", scores: { mint: 3 } },
+      { icon: "🌸", text: "「ずっとそばにいたい」",     scores: { rose: 3 } },
+      { icon: "🤍", text: "「その存在が私の宝物」",     scores: { ivory: 3 } }
+    ]
+  },
+  {
+    text: "落ち込んだとき、あなたを救ってくれるのは？",
+    choices: [
+      { icon: "🎤", text: "推しの歌声や言葉",                   scores: { rose: 2, lavender: 1 } },
+      { icon: "🎬", text: "推しの映像を繰り返し見ること",       scores: { skyblue: 2, mint: 1 } },
+      { icon: "✍️", text: "気持ちを書き出したり、絵を描くこと", scores: { ivory: 2, lavender: 1 } },
+      { icon: "👥", text: "同じ推しを持つ友達と話すこと",       scores: { mint: 2, skyblue: 1 } }
+    ]
+  },
+  {
+    text: "推しに会えるとしたら、何を伝えたい？",
+    choices: [
+      { icon: "🙏", text: "「ありがとう、あなたのおかげで生きられた」", scores: { ivory: 2, lavender: 1 } },
+      { icon: "💌", text: "「大好きです、ずっと応援しています」",       scores: { rose: 2, ivory: 1 } },
+      { icon: "🌟", text: "「あなたの夢を、私も信じている」",           scores: { mint: 2, skyblue: 1 } },
+      { icon: "😊", text: "「笑顔でいてくれてありがとう」",             scores: { skyblue: 2, rose: 1 } }
+    ]
+  },
+  {
+    text: "あなたにとって「推す」とはどういうこと？",
+    choices: [
+      { icon: "🕊️", text: "存在するだけで世界が美しくなること",   scores: { lavender: 2, ivory: 1 } },
+      { icon: "🔥", text: "毎日に熱と理由を与えてくれること",     scores: { mint: 2, skyblue: 1 } },
+      { icon: "💎", text: "他の何にも変えられない宝物を持つこと", scores: { ivory: 2, rose: 1 } },
+      { icon: "🌈", text: "自分の感情が全部肯定される感覚",       scores: { rose: 2, lavender: 1 } }
+    ]
+  }
+];
+
+const results = {
+  lavender: {
+    name: "ラベンダー", sub: "Lavender / 幻夢の紫",
+    color: "#c4a0e8", gradient: "linear-gradient(135deg, #c4a0e8, #9b72cf)",
+    desc: "あなたの推し色は「ラベンダー」。静かに深く、誰よりも純粋に愛せる人。感情は内側で輝いていて、言葉にならない愛情を持っています。推しの存在を、まるで夢の中の光のように大切にしている。その優しさは、推しにとってもきっと特別な温度を持っています。",
+    tags: ["静かな愛情家", "深く感じる人", "繊細な魂", "夢を見る人"],
+    oshi: "「あなたがいるから、この世界は美しい」と、心の中でいつも思っているはず。言葉にしなくても、その想いはきっと届いています。"
+  },
+  skyblue: {
+    name: "スカイブルー", sub: "Sky Blue / 蒼穹の青",
+    color: "#6ab8e8", gradient: "linear-gradient(135deg, #6ab8e8, #3a8fc4)",
+    desc: "あなたの推し色は「スカイブルー」。どこまでも追いかけ続ける、エネルギーと純粋さを持った推し活の体現者。推しの成長を誰よりも信じて、全力で応援できる力があります。その熱量は本物で、推しの背中を押す風になっています。",
+    tags: ["全力応援タイプ", "追いかける勇気", "エネルギッシュ", "ブレない信念"],
+    oshi: "あなたが掲げるペンライトの光は、どんな大きな会場でも届いている。推しはきっとその光を知っています。"
+  },
+  mint: {
+    name: "ミントグリーン", sub: "Mint Green / 清新の緑",
+    color: "#7cd4b4", gradient: "linear-gradient(135deg, #7cd4b4, #4aad8a)",
+    desc: "あなたの推し色は「ミントグリーン」。推しと一緒に成長していきたい、前向きで清らかな愛を持つ人。推しの挑戦を自分のことのように喜び、失敗さえも「一緒に乗り越えよう」と思える強さがあります。その愛は清潔で、嫌味がなく、推しを本当の意味で支えられる色。",
+    tags: ["共に歩む人", "前向きな愛情", "清らかさ", "成長を喜ぶ"],
+    oshi: "推しが新しいことに挑戦するたびに、あなたは誰よりも「できる」と信じていた。その信頼が、推しを動かしています。"
+  },
+  rose: {
+    name: "ローズピンク", sub: "Rose Pink / 恋情の薔薇",
+    color: "#e87898", gradient: "linear-gradient(135deg, #e87898, #c4506c)",
+    desc: "あなたの推し色は「ローズピンク」。感情豊かに、全身で愛せる情熱の人。推しへの気持ちが溢れて止まらない、その感情の豊かさがあなたの最大の魅力。泣いて笑って、全部本物。その真っ直ぐな愛情は、推しにとって太陽のような存在です。",
+    tags: ["情熱的な愛情家", "感情豊か", "全力で愛する", "素直な心"],
+    oshi: "あなたの笑顔と涙は、推しへの最高の贈り物。感情を隠さないで。その真っ直ぐさが、推しを幸せにしています。"
+  },
+  ivory: {
+    name: "アイボリー", sub: "Ivory / 永遠の白磁",
+    color: "#e8dfc4", gradient: "linear-gradient(135deg, #e8dfc4, #c8b890)",
+    desc: "あなたの推し色は「アイボリー」。流行に左右されず、ずっとそこにいる。永遠の忠誠を誓うような、深くて静かな愛の持ち主。推しのすべてを「宝物」として大切にして、その存在の価値を誰よりも分かっている人。時間が経っても変わらない愛情は、本物の証。",
+    tags: ["永遠の推し活", "ブレない愛", "深い理解者", "宝物にする人"],
+    oshi: "デビューの頃から今まで、ずっと変わらない目で見てくれているあなた。推しにとって、あなたは特別な存在です。"
+  }
+};
+
+let scores = { lavender: 0, skyblue: 0, mint: 0, rose: 0, ivory: 0 };
+let currentQ = 0;
+
+function startQuiz() {
+  document.getElementById('startScreen').style.display = 'none';
+  document.getElementById('quizScreen').style.display = 'block';
+  showQuestion();
+}
+
+function showQuestion() {
+  const q = questions[currentQ];
+  const pct = Math.round((currentQ / questions.length) * 100);
+  document.getElementById('progressText').textContent = `Q${currentQ + 1} / ${questions.length}`;
+  document.getElementById('progressPct').textContent = pct + '%';
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('questionNum').textContent = 'QUESTION ' + String(currentQ + 1).padStart(2, '0');
+  document.getElementById('questionText').textContent = q.text;
+  const card = document.getElementById('questionCard');
+  card.style.animation = 'none';
+  setTimeout(() => { card.style.animation = 'slideUp 0.5s cubic-bezier(0.4,0,0.2,1) both'; }, 10);
+  const choicesEl = document.getElementById('choices');
+  choicesEl.innerHTML = '';
+  q.choices.forEach((c) => {
+    const btn = document.createElement('button');
+    btn.className = 'choice-btn';
+    btn.innerHTML = `<span class="choice-icon">${c.icon}</span><span>${c.text}</span>`;
+    btn.onclick = () => selectChoice(c.scores, btn);
+    choicesEl.appendChild(btn);
+  });
+}
+
+function selectChoice(scoreMap, btn) {
+  document.querySelectorAll('.choice-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  Object.entries(scoreMap).forEach(([k, v]) => { scores[k] += v; });
+  setTimeout(() => {
+    currentQ++;
+    if (currentQ < questions.length) { showQuestion(); } else { showResult(); }
+  }, 300);
+}
+
+function showResult() {
+  document.getElementById('quizScreen').style.display = 'none';
+  const rs = document.getElementById('resultScreen');
+  rs.classList.add('show');
+  const top = Object.entries(scores).sort((a, b) => b[1] - a[1])[0][0];
+  const r = results[top];
+  document.getElementById('progressFill').style.width = '100%';
+  const display = document.getElementById('resultColorDisplay');
+  display.style.background = r.gradient;
+  display.style.setProperty('--result-color', r.color);
+  display.style.boxShadow = `0 0 40px ${r.color}80`;
+  document.getElementById('resultColorName').textContent = r.name;
+  document.getElementById('resultColorName').style.background = r.gradient;
+  document.getElementById('resultColorName').style.webkitBackgroundClip = 'text';
+  document.getElementById('resultColorName').style.webkitTextFillColor = 'transparent';
+  document.getElementById('resultColorName').style.backgroundClip = 'text';
+  document.getElementById('resultColorSub').textContent = r.sub;
+  document.getElementById('resultDesc').textContent = r.desc;
+  document.getElementById('resultOshi').textContent = r.oshi;
+  const tagsEl = document.getElementById('resultTags');
+  tagsEl.innerHTML = r.tags.map(t => `<span class="tag">${t}</span>`).join('');
+}
+
+function switchTab(type, el) {
+  document.querySelectorAll('.delivery-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.delivery-panel').forEach(p => p.classList.remove('show'));
+  el.classList.add('active');
+  document.getElementById('panel-' + type).classList.add('show');
+}
+  
+function openLine() {
+  // ★ LINE公式アカウントのURLに変更してください
+  const lineUrl = 'https://lin.ee/あなたのURL';
+  window.open(lineUrl, '_blank');
+}
+
+function validateMail() {
+  const val = document.getElementById('mailInput').value;
+  const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+  document.getElementById('mailSendBtn').disabled = !ok;
+}
+
+function sendMail() {
+  const email     = document.getElementById('mailInput').value;
+  const colorName = document.getElementById('resultColorName').textContent;
+  const colorSub  = document.getElementById('resultColorSub').textContent;
+  const desc      = document.getElementById('resultDesc').textContent;
+  const oshi      = document.getElementById('resultOshi').textContent;
+
+  // ★ FormspreeのIDに変更してください（formspree.io で無料取得）
+  const FORMSPREE_URL = 'https://formspree.io/f/mwvrdrba';
+
+  const btn = document.getElementById('mailSendBtn');
+  btn.disabled = true;
+  btn.textContent = '送信中…';
+
+  fetch(FORMSPREE_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email,
+      subject: `【推し色占い】あなたの推し色は「${colorName}」`,
+      message: `▶ ${colorName}（${colorSub}）\n\n${desc}\n\n✦ 推しへのメッセージ\n${oshi}`
+    })
+  })
+  .then(res => {
+    if (res.ok) {
+      document.getElementById('mailForm').style.display = 'none';
+      document.getElementById('mailSuccess').classList.add('show');
+    } else {
+      btn.disabled = false;
+      btn.textContent = '送る';
+      alert('送信に失敗しました。もう一度お試しください。');
+    }
+  })
+  .catch(() => {
+    btn.disabled = false;
+    btn.textContent = '送る';
+    alert('通信エラーが発生しました。');
+  });
+}
+
+function resetQuiz() {
+  scores = { lavender: 0, skyblue: 0, mint: 0, rose: 0, ivory: 0 };
+  currentQ = 0;
+  document.getElementById('resultScreen').classList.remove('show');
+  document.getElementById('startScreen').style.display = 'block';
+  document.getElementById('mailForm').style.display = '';
+  document.getElementById('mailSuccess').classList.remove('show');
+  document.getElementById('mailInput').value = '';
+  document.getElementById('mailSendBtn').disabled = true;
+  document.getElementById('mailSendBtn').textContent = '送る';
+}
+</script>
+</body>
+</html>

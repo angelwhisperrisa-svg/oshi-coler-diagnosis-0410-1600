@@ -1,0 +1,650 @@
+import { useState } from "react";
+
+const TYPES = {
+  海風: {
+    emoji: "🌊",
+    color: "#4db8d4",
+    bg: "linear-gradient(135deg, #e8f4f8, #c8e8f0)",
+    desc: "海風のように、広がりのある景色や深い呼吸で整いやすいタイプです。海の音や軽やかな空気が、今のあなたをやさしく整えてくれます。",
+    suggest: "波照間の海ヒーリングミュージック × 海風の壁紙",
+  },
+  夜花: {
+    emoji: "🌸",
+    color: "#d4a0c0",
+    bg: "linear-gradient(135deg, #f0e8f4, #e0c8e0)",
+    desc: "夜に咲く花のように、静かな時間の中で整いやすいタイプです。やさしい余韻や夜の空気が、心をそっと落ち着けてくれます。",
+    suggest: "夜花の音時間 × サガリバナの壁紙",
+  },
+  朝光: {
+    emoji: "☀️",
+    color: "#e8c878",
+    bg: "linear-gradient(135deg, #fdf8e8, #f5e8c0)",
+    desc: "朝の光のように、やわらかな明るさで整いやすいタイプです。小さな始まりや軽いリズムが、一日の流れをやさしく整えてくれます。",
+    suggest: "朝の整え音源 × 朝光の壁紙",
+  },
+  島畑: {
+    emoji: "🌿",
+    color: "#78b896",
+    bg: "linear-gradient(135deg, #e8f4ec, #c8e8d4)",
+    desc: "島の畑のように、安心感や自然のぬくもりで整いやすいタイプです。緑や土の気配が、今のあなたをゆっくり落ち着かせてくれます。",
+    suggest: "島時間の整え音 × 緑の壁紙",
+  },
+};
+
+const QUESTIONS = [
+  {
+    q: "今、心が求めているものは？",
+    options: ["広い空と海", "静かな夜", "明るい朝", "大地のぬくもり"],
+  },
+  {
+    q: "休日の理想の過ごし方は？",
+    options: ["海辺でのんびり", "夜に映画や音楽", "早起きして散歩", "自然の中でゆっくり"],
+  },
+  {
+    q: "今のあなたに近いのは？",
+    options: ["気持ちを軽くしたい", "静かに整えたい", "前向きに始めたい", "安心して戻りたい"],
+  },
+];
+
+const TYPE_KEYS = ["海風", "夜花", "朝光", "島畑"];
+
+export default function App() {
+  const [step, setStep] = useState("top");
+  const [answers, setAnswers] = useState([]);
+  const [result, setResult] = useState(null);
+  const [email, setEmail] = useState("");
+  const [emailDone, setEmailDone] = useState(false);
+
+  const handleAnswer = (i) => {
+    const next = [...answers, i];
+    setAnswers(next);
+
+    if (next.length === QUESTIONS.length) {
+      const counts = [0, 0, 0, 0];
+      next.forEach((a) => counts[a]++);
+      const max = counts.indexOf(Math.max(...counts));
+      setResult(TYPE_KEYS[max]);
+      setStep("result");
+    }
+  };
+
+  const currentQ = QUESTIONS[answers.length];
+
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background:
+          "linear-gradient(160deg, #f0f8ff 0%, #fdf6f0 50%, #f4f0f8 100%)",
+        fontFamily: "'Hiragino Mincho ProN', 'Georgia', serif",
+        color: "#3a3a3a",
+      }}
+    >
+      {step === "top" && (
+        <div
+          style={{
+            maxWidth: 480,
+            margin: "0 auto",
+            padding: "48px 24px",
+            textAlign: "center",
+          }}
+        >
+          <div style={{ fontSize: 48, marginBottom: 16 }}>🌊</div>
+
+          <div
+            style={{
+              fontSize: 11,
+              letterSpacing: "0.35em",
+              color: "#a0b8c8",
+              marginBottom: 12,
+              textTransform: "uppercase",
+            }}
+          >
+            Kaorin Kohbo
+          </div>
+
+          <h1
+            style={{
+              fontSize: 26,
+              fontWeight: "bold",
+              lineHeight: 1.5,
+              marginBottom: 12,
+              color: "#2a4a5a",
+            }}
+          >
+            海と島時間が教えてくれる
+            <br />
+            あなただけの整え方
+          </h1>
+
+          <p
+            style={{
+              fontSize: 14,
+              color: "#7a8a94",
+              lineHeight: 1.9,
+              marginBottom: 40,
+            }}
+          >
+            忙しい日々の中でも、
+            <br />
+            やさしく自分を整えるための
+            <br />
+            小さなお守りのような時間を見つけませんか。
+          </p>
+
+          <div
+            style={{
+              background: "rgba(255,255,255,0.8)",
+              borderRadius: 24,
+              padding: "32px 28px",
+              marginBottom: 24,
+              boxShadow: "0 8px 40px rgba(100,160,200,0.12)",
+              border: "1px solid rgba(180,210,230,0.3)",
+            }}
+          >
+            <div
+              style={{
+                fontSize: 13,
+                color: "#7ab0c8",
+                marginBottom: 8,
+                letterSpacing: "0.2em",
+              }}
+            >
+              無料診断
+            </div>
+
+            <div
+              style={{
+                fontSize: 18,
+                fontWeight: "bold",
+                color: "#2a4a5a",
+                marginBottom: 12,
+              }}
+            >
+              今のあなたに合う整え方診断
+            </div>
+
+            <div
+              style={{
+                fontSize: 13,
+                color: "#9aaab4",
+                marginBottom: 24,
+                lineHeight: 1.8,
+              }}
+            >
+              3つの質問で、今のあなたに合う整え方がわかります。
+              <br />
+              海風・夜花・朝光・島畑、どのタイプ？
+            </div>
+
+            <button
+              onClick={() => setStep("quiz")}
+              style={{
+                width: "100%",
+                padding: "16px",
+                borderRadius: 99,
+                border: "none",
+                background: "linear-gradient(135deg, #4db8d4, #78b8c8)",
+                color: "#fff",
+                fontSize: 15,
+                fontWeight: "bold",
+                letterSpacing: "0.1em",
+                cursor: "pointer",
+              }}
+            >
+              診断をはじめる 🌊
+            </button>
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              gap: 12,
+              justifyContent: "center",
+              flexWrap: "wrap",
+            }}
+          >
+            {["有料デジタル診断", "デジタル壁紙", "スマホ待受"].map(
+              (item) => (
+                <div
+                  key={item}
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: 99,
+                    background: "rgba(255,255,255,0.7)",
+                    border: "1px solid rgba(180,210,230,0.4)",
+                    fontSize: 12,
+                    color: "#7a9aaa",
+                  }}
+                >
+                  {item}
+                </div>
+              )
+            )}
+          </div>
+        </div>
+      )}
+
+      {step === "quiz" && (
+        <div
+          style={{
+            maxWidth: 480,
+            margin: "0 auto",
+            padding: "48px 24px",
+            textAlign: "center",
+          }}
+        >
+          <div
+            style={{
+              fontSize: 12,
+              color: "#a0b8c8",
+              marginBottom: 32,
+              letterSpacing: "0.2em",
+            }}
+          >
+            質問 {answers.length + 1} / {QUESTIONS.length}
+          </div>
+
+          <div
+            style={{
+              background: "rgba(255,255,255,0.85)",
+              borderRadius: 24,
+              padding: "36px 28px",
+              boxShadow: "0 8px 40px rgba(100,160,200,0.12)",
+              border: "1px solid rgba(180,210,230,0.3)",
+            }}
+          >
+            <div
+              style={{
+                fontSize: 18,
+                fontWeight: "bold",
+                color: "#2a4a5a",
+                marginBottom: 28,
+                lineHeight: 1.6,
+              }}
+            >
+              {currentQ.q}
+            </div>
+
+            {currentQ.options.map((opt, i) => (
+              <button
+                key={i}
+                onClick={() => handleAnswer(i)}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  padding: "14px 20px",
+                  marginBottom: 12,
+                  borderRadius: 14,
+                  border: "1.5px solid rgba(180,210,230,0.5)",
+                  background: "rgba(240,250,255,0.7)",
+                  color: "#2a4a5a",
+                  fontSize: 14,
+                  cursor: "pointer",
+                  textAlign: "left",
+                  letterSpacing: "0.05em",
+                }}
+              >
+                {opt}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {step === "result" && result && (
+        <div
+          style={{
+            maxWidth: 480,
+            margin: "0 auto",
+            padding: "48px 24px",
+            textAlign: "center",
+          }}
+        >
+          <div
+            style={{
+              background: TYPES[result].bg,
+              borderRadius: 28,
+              padding: "40px 28px",
+              marginBottom: 20,
+              boxShadow: "0 12px 50px rgba(100,160,200,0.15)",
+              border: `1.5px solid ${TYPES[result].color}40`,
+            }}
+          >
+            <div style={{ fontSize: 52, marginBottom: 16 }}>
+              {TYPES[result].emoji}
+            </div>
+
+            <div
+              style={{
+                fontSize: 11,
+                color: TYPES[result].color,
+                letterSpacing: "0.3em",
+                marginBottom: 8,
+              }}
+            >
+              あなたは
+            </div>
+
+            <div
+              style={{
+                fontSize: 28,
+                fontWeight: "bold",
+                color: "#2a4a5a",
+                marginBottom: 16,
+              }}
+            >
+              {result}タイプ
+            </div>
+
+            <p
+              style={{
+                fontSize: 14,
+                color: "#5a6a74",
+                lineHeight: 1.9,
+                marginBottom: 24,
+              }}
+            >
+              {TYPES[result].desc}
+            </p>
+
+            <div
+              style={{
+                background: "rgba(255,255,255,0.6)",
+                borderRadius: 14,
+                padding: "14px 18px",
+                fontSize: 13,
+                color: "#5a7a8a",
+              }}
+            >
+              おすすめ：{TYPES[result].suggest}
+            </div>
+          </div>
+
+          <button
+            onClick={() => setStep("gift")}
+            style={{
+              width: "100%",
+              padding: "16px",
+              borderRadius: 99,
+              border: "none",
+              background: "linear-gradient(135deg, #d4a0c0, #b888a8)",
+              color: "#fff",
+              fontSize: 15,
+              fontWeight: "bold",
+              cursor: "pointer",
+            }}
+          >
+            無料特典を受け取る 🌸
+          </button>
+        </div>
+      )}
+
+      {step === "gift" && (
+        <div
+          style={{
+            maxWidth: 480,
+            margin: "0 auto",
+            padding: "48px 24px",
+            textAlign: "center",
+          }}
+        >
+          <div
+            style={{
+              background: "rgba(255,255,255,0.85)",
+              borderRadius: 24,
+              padding: "36px 28px",
+              marginBottom: 20,
+              boxShadow: "0 8px 40px rgba(100,160,200,0.12)",
+              border: "1px solid rgba(180,210,230,0.3)",
+            }}
+          >
+            <div style={{ fontSize: 40, marginBottom: 16 }}>🎁</div>
+
+            <div
+              style={{
+                fontSize: 13,
+                color: "#7ab0c8",
+                letterSpacing: "0.2em",
+                marginBottom: 8,
+              }}
+            >
+              無料特典
+            </div>
+
+            <div
+              style={{
+                fontSize: 20,
+                fontWeight: "bold",
+                color: "#2a4a5a",
+                marginBottom: 12,
+              }}
+            >
+              波照間の海
+              <br />
+              ヒーリングミュージック
+            </div>
+
+            <p
+              style={{
+                fontSize: 13,
+                color: "#7a8a94",
+                lineHeight: 1.9,
+                marginBottom: 24,
+              }}
+            >
+              波照間の海の気配を、音でやさしく届けます。
+              <br />
+              島時間がそっとあなたを包みます。
+            </p>
+
+            {!emailDone ? (
+              <>
+                <input
+                  type="email"
+                  placeholder="メールアドレスを入力"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "14px 18px",
+                    borderRadius: 12,
+                    border: "1.5px solid rgba(180,210,230,0.5)",
+                    fontSize: 14,
+                    marginBottom: 12,
+                    background: "rgba(240,250,255,0.7)",
+                    color: "#2a4a5a",
+                    boxSizing: "border-box",
+                  }}
+                />
+                <button
+                  onClick={() => setEmailDone(true)}
+                  style={{
+                    width: "100%",
+                    padding: "14px",
+                    borderRadius: 99,
+                    border: "none",
+                    background: "linear-gradient(135deg, #4db8d4, #78b8c8)",
+                    color: "#fff",
+                    fontSize: 14,
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                  }}
+                >
+                  特典を受け取る →
+                </button>
+              </>
+            ) : (
+              <div
+                style={{
+                  color: "#78b896",
+                  fontSize: 15,
+                  fontWeight: "bold",
+                }}
+              >
+                ✓ ありがとうございます。メールをご確認ください 🌊
+              </div>
+            )}
+          </div>
+
+          {emailDone && (
+            <button
+              onClick={() => setStep("shop")}
+              style={{
+                width: "100%",
+                padding: "16px",
+                borderRadius: 99,
+                border: "none",
+                background: "linear-gradient(135deg, #78b896, #5a9a7a)",
+                color: "#fff",
+                fontSize: 15,
+                fontWeight: "bold",
+                cursor: "pointer",
+              }}
+            >
+              デジタル商品を見る 🌿
+            </button>
+          )}
+        </div>
+      )}
+
+      {step === "shop" && (
+        <div
+          style={{
+            maxWidth: 480,
+            margin: "0 auto",
+            padding: "48px 24px",
+          }}
+        >
+          <div style={{ textAlign: "center", marginBottom: 28 }}>
+            <div
+              style={{
+                fontSize: 13,
+                color: "#7ab0c8",
+                letterSpacing: "0.2em",
+                marginBottom: 8,
+              }}
+            >
+              デジタル商品
+            </div>
+
+            <div
+              style={{
+                fontSize: 22,
+                fontWeight: "bold",
+                color: "#2a4a5a",
+              }}
+            >
+              あなたの整えを深める
+            </div>
+          </div>
+
+          {[
+            {
+              emoji: "✨",
+              name: "有料デジタル診断",
+              desc: "あなたのタイプをより深く。今の整え方や、日々のヒントを詳しくお届けします。",
+              price: "¥1,500",
+            },
+            {
+              emoji: "🖼️",
+              name: "デジタル壁紙セット",
+              desc: "海風・夜花・朝光・島畑、それぞれの空気を感じる壁紙セットです。",
+              price: "¥800",
+            },
+            {
+              emoji: "📱",
+              name: "スマホ待受",
+              desc: "島時間を毎日の中で感じるための、やさしい待受画像セットです。",
+              price: "¥500",
+            },
+          ].map((item) => (
+            <div
+              key={item.name}
+              style={{
+                background: "rgba(255,255,255,0.85)",
+                borderRadius: 20,
+                padding: "24px",
+                marginBottom: 14,
+                boxShadow: "0 4px 24px rgba(100,160,200,0.1)",
+                border: "1px solid rgba(180,210,230,0.3)",
+                display: "flex",
+                gap: 16,
+                alignItems: "center",
+              }}
+            >
+              <div style={{ fontSize: 32 }}>{item.emoji}</div>
+
+              <div style={{ flex: 1 }}>
+                <div
+                  style={{
+                    fontSize: 15,
+                    fontWeight: "bold",
+                    color: "#2a4a5a",
+                    marginBottom: 4,
+                  }}
+                >
+                  {item.name}
+                </div>
+
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "#8a9aaa",
+                    lineHeight: 1.7,
+                  }}
+                >
+                  {item.desc}
+                </div>
+              </div>
+
+              <div
+                style={{
+                  fontSize: 14,
+                  fontWeight: "bold",
+                  color: "#4db8d4",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {item.price}
+              </div>
+            </div>
+          ))}
+
+          <div
+            style={{
+              background: "rgba(240,248,244,0.8)",
+              borderRadius: 16,
+              padding: "20px 24px",
+              border: "1px solid rgba(120,184,150,0.3)",
+              textAlign: "center",
+              marginTop: 8,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 12,
+                color: "#78b896",
+                marginBottom: 6,
+                letterSpacing: "0.15em",
+              }}
+            >
+              特別版
+            </div>
+
+            <div
+              style={{
+                fontSize: 14,
+                color: "#4a6a5a",
+              }}
+            >
+              サシェ・お香などの物販は
+              <br />
+              限定・特別版としてご案内予定
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
