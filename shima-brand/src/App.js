@@ -1,395 +1,686 @@
-import { useState } from "react";
+import React, { useState } from "react";
 
-const TYPES = {
-  海風: {
-    emoji: "🌊",
-    color: "#5ba3c9",
-    lightBg: "#eef7fc",
-    desc: "開放的で自由な海風のように、流れに身をまかせながら心を整えるタイプ。深呼吸と波の音があなたの守り。",
-    suggest: "波照間の海音ヒーリング × 海風壁紙",
-    action: "今日は窓を開けて、空気を入れ替えてみてください。",
-  },
-  夜花: {
-    emoji: "🌸",
-    color: "#c490b0",
-    lightBg: "#fdf0f7",
-    desc: "夜にそっと咲くサガリバナのように、静かな時間の中で輝くタイプ。夜のひとり時間が心の栄養になります。",
-    suggest: "夜花瞑想音源 × サガリバナ壁紙",
-    action: "今夜は少し早めに電気を暗くして、ゆっくり過ごしてみてください。",
-  },
-  朝光: {
-    emoji: "🌤️",
-    color: "#d4a843",
-    lightBg: "#fdf8ee",
-    desc: "朝の光のように清らかで前向きなタイプ。小さな朝のルーティンが一日を整えてくれます。",
-    suggest: "朝の整え音源 × 朝光壁紙",
-    action: "明日の朝、起きたらまず水を一杯飲んでみてください。",
-  },
-  島畑: {
-    emoji: "🌿",
-    color: "#5a9e7a",
-    lightBg: "#eef7f2",
-    desc: "島の大地に根を張るように、ゆっくり丁寧に生きるタイプ。土や緑の香りが心を落ち着かせてくれます。",
-    suggest: "島草木の香りサシェ × 緑の壁紙",
-    action: "今日は植物や自然のものに少し触れてみてください。",
-  },
-};
-
-const QUESTIONS = [
-  {
-    q: "今、心が一番求めているものは？",
-    options: [
-      { label: "広い空と、風", type: "海風" },
-      { label: "静かな夜と、ひとり時間", type: "夜花" },
-      { label: "明るい朝と、新しい一歩", type: "朝光" },
-      { label: "大地のぬくもりと、ゆっくりした時間", type: "島畑" },
-    ],
-  },
-  {
-    q: "疲れたとき、自然とやっていることは？",
-    options: [
-      { label: "外に出て、空気を吸う", type: "海風" },
-      { label: "部屋を暗くして、音楽を聴く", type: "夜花" },
-      { label: "早寝して、朝すっきり起きる", type: "朝光" },
-      { label: "お茶を飲みながら、ぼーっとする", type: "島畑" },
-    ],
-  },
-  {
-    q: "理想の休日の過ごし方は？",
-    options: [
-      { label: "海や川のそばで、のんびり", type: "海風" },
-      { label: "夜に映画や本を楽しむ", type: "夜花" },
-      { label: "早起きして、朝の散歩", type: "朝光" },
-      { label: "庭や公園で、植物と過ごす", type: "島畑" },
-    ],
-  },
+const questions = [
+  { text: "夜、ひとりでいるとき、自然と何をしていることが多い？", choices: [
+    { icon: "🎵", text: "音楽を聴きながら、ぼーっとしている", scores: { lavender: 2, skyblue: 1 } },
+    { icon: "📖", text: "本や漫画を読んでいる", scores: { ivory: 2, mint: 1 } },
+    { icon: "✨", text: "推しのことを考えて妄想している", scores: { rose: 2, lavender: 1 } },
+    { icon: "📱", text: "SNSで好きなものを集めている", scores: { skyblue: 2, mint: 1 } }
+  ]},
+  { text: "推しを見ているとき、胸の中に来るのはどんな感覚？", choices: [
+    { icon: "🌸", text: "あたたかくて、泣きそうになる", scores: { rose: 2, ivory: 1 } },
+    { icon: "⚡", text: "興奮して、全力で応援したくなる", scores: { mint: 2, skyblue: 1 } },
+    { icon: "🌙", text: "静かに、でも確かに満たされる", scores: { lavender: 2, ivory: 1 } },
+    { icon: "💫", text: "自分も輝けるような気がしてくる", scores: { skyblue: 2, rose: 1 } }
+  ]},
+  { text: "選ぶとしたら、どんな空間が好き？", choices: [
+    { icon: "🕯️", text: "間接照明のやわらかい、静かな部屋", scores: { lavender: 2, ivory: 1 } },
+    { icon: "🌿", text: "植物があって、光が差し込む場所", scores: { mint: 2, ivory: 1 } },
+    { icon: "🌆", text: "夜景が見える、少し非日常な場所", scores: { skyblue: 2, lavender: 1 } },
+    { icon: "🌸", text: "花や好きなものに囲まれた、自分だけの空間", scores: { rose: 2, mint: 1 } }
+  ]},
+  { text: "推しへの気持ちを一言で表すなら？", choices: [
+    { icon: "💜", text: "「いてくれるだけでいい」", scores: { lavender: 3 } },
+    { icon: "💙", text: "「どこまでも追いかけたい」", scores: { skyblue: 3 } },
+    { icon: "💚", text: "「一緒に成長していきたい」", scores: { mint: 3 } },
+    { icon: "🌸", text: "「ずっとそばにいたい」", scores: { rose: 3 } },
+    { icon: "🤍", text: "「その存在が私の宝物」", scores: { ivory: 3 } }
+  ]},
+  { text: "落ち込んだとき、あなたを救ってくれるのは？", choices: [
+    { icon: "🎤", text: "推しの歌声や言葉", scores: { rose: 2, lavender: 1 } },
+    { icon: "🎬", text: "推しの映像を繰り返し見ること", scores: { skyblue: 2, mint: 1 } },
+    { icon: "✍️", text: "気持ちを書き出したり、絵を描くこと", scores: { ivory: 2, lavender: 1 } },
+    { icon: "👥", text: "同じ推しを持つ友達と話すこと", scores: { mint: 2, skyblue: 1 } }
+  ]},
+  { text: "推しに会えるとしたら、何を伝えたい？", choices: [
+    { icon: "🙏", text: "「ありがとう、あなたのおかげで生きられた」", scores: { ivory: 2, lavender: 1 } },
+    { icon: "💌", text: "「大好きです、ずっと応援しています」", scores: { rose: 2, ivory: 1 } },
+    { icon: "🌟", text: "「あなたの夢を、私も信じている」", scores: { mint: 2, skyblue: 1 } },
+    { icon: "😊", text: "「笑顔でいてくれてありがとう」", scores: { skyblue: 2, rose: 1 } }
+  ]},
+  { text: "あなたにとって「推す」とはどういうこと？", choices: [
+    { icon: "🕊️", text: "存在するだけで世界が美しくなること", scores: { lavender: 2, ivory: 1 } },
+    { icon: "🔥", text: "毎日に熱と理由を与えてくれること", scores: { mint: 2, skyblue: 1 } },
+    { icon: "💎", text: "他の何にも変えられない宝物を持つこと", scores: { ivory: 2, rose: 1 } },
+    { icon: "🌈", text: "自分の感情が全部肯定される感覚", scores: { rose: 2, lavender: 1 } }
+  ]}
 ];
 
+const results = {
+  lavender: { name: "ラベンダー", sub: "Lavender / 幻夢の紫", color: "#c4a0e8", gradient: "linear-gradient(135deg, #c4a0e8, #9b72cf)", desc: "あなたの推し色は「ラベンダー」。静かに深く、誰よりも純粋に愛せる人。感情は内側で輝いていて、言葉にならない愛情を持っています。推しの存在を、まるで夢の中の光のように大切にしている。その優しさは、推しにとって特別な温度を持っています。", tags: ["静かな愛情家", "深く感じる人", "繊細な魂", "夢を見る人"], oshi: "「あなたがいるから、この世界は美しい」と、心の中でいつも思っているはず。言葉にしなくても、その想いはきっと届いています。" },
+  skyblue:  { name: "スカイブルー", sub: "Sky Blue / 蒼穹の青", color: "#6ab8e8", gradient: "linear-gradient(135deg, #6ab8e8, #3a8fc4)", desc: "あなたの推し色は「スカイブルー」。どこまでも追いかけ続ける、エネルギーと純粋さを持った推し活の体現者。推しの成長を誰よりも信じて、全力で応援できる力があります。その熱量は本物で、推しの背中を押す風になっています。", tags: ["全力応援タイプ", "追いかける勇気", "エネルギッシュ", "ブレない信念"], oshi: "あなたが掲げるペンライトの光は、どんな大きな会場でも届いている。推しはきっとその光を知っています。" },
+  mint:     { name: "ミントグリーン", sub: "Mint Green / 清新の緑", color: "#7cd4b4", gradient: "linear-gradient(135deg, #7cd4b4, #4aad8a)", desc: "あなたの推し色は「ミントグリーン」。推しと一緒に成長していきたい、前向きで清らかな愛を持つ人。推しの挑戦を自分のことのように喜び、失敗さえも「一緒に乗り越えよう」と思える強さがあります。その愛は清潔で、嫌味がなく、推しを本当の意味で支えられる色。", tags: ["共に歩む人", "前向きな愛情", "清らかさ", "成長を喜ぶ"], oshi: "推しが新しいことに挑戦するたびに、あなたは誰よりも「できる」と信じていた。その信頼が、推しを動かしています。" },
+  rose:     { name: "ローズピンク", sub: "Rose Pink / 恋情の薔薇", color: "#e87898", gradient: "linear-gradient(135deg, #e87898, #c4506c)", desc: "あなたの推し色は「ローズピンク」。感情豊かに、全身で愛せる情熱の人。推しへの気持ちが溢れて止まらない、その感情の豊かさがあなたの最大の魅力。泣いて笑って、全部本物。その真っ直ぐな愛情は、推しにとって太陽のような存在です。", tags: ["情熱的な愛情家", "感情豊か", "全力で愛する", "素直な心"], oshi: "あなたの笑顔と涙は、推しへの最高の贈り物。感情を隠さないで。その真っ直ぐさが、推しを幸せにしています。" },
+  ivory:    { name: "アイボリー", sub: "Ivory / 永遠の白磁", color: "#e8dfc4", gradient: "linear-gradient(135deg, #e8dfc4, #c8b890)", desc: "あなたの推し色は「アイボリー」。流行に左右されず、ずっとそこにいる。永遠の忠誠を誓うような、深くて静かな愛の持ち主。推しのすべてを「宝物」として大切にして、その存在の価値を誰よりも分かっている人。時間が経っても変わらない愛情は、本物の証。", tags: ["永遠の推し活", "ブレない愛", "深い理解者", "宝物にする人"], oshi: "デビューの頃から今まで、ずっと変わらない目で見てくれているあなた。推しにとって、あなたは特別な存在です。" }
+};
+
+const initialScores = { lavender: 0, skyblue: 0, mint: 0, rose: 0, ivory: 0 };
+const petals = ["🌸", "🌺", "🌷", "💮", "🌸", "🌺"];
+const butterflies = ["🦋", "🦋", "🦋"];
+const petalLanes = [4, 12, 20, 80, 88, 96];
+const butterflyLanes = [7, 15, 85, 93];
+
+const styles = `
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Zen Maru Gothic", sans-serif;
+    color: #333;
+    background: radial-gradient(circle at 20% 20%, #f9f2ff 0%, #eef7ff 45%, #eef5f0 100%);
+    overflow-x: hidden;
+  }
+
+  .page {
+    min-height: 100vh;
+    position: relative;
+    padding: 26px 14px 40px;
+  }
+
+  .float-layer-back,
+  .float-layer-mid {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .float-layer-back { z-index: 0; }
+  .float-layer-mid { z-index: 8; }
+
+  .container {
+    position: relative;
+    z-index: 2;
+  }
+
+  .float-item {
+    position: absolute;
+    opacity: 0;
+    filter: drop-shadow(0 4px 10px rgba(255, 255, 255, 0.6));
+  }
+
+  .petal {
+    font-size: 14px;
+    animation: petalFloat linear infinite;
+  }
+
+  .butterfly {
+    font-size: 13px;
+    animation: butterflyFloat ease-in-out infinite;
+  }
+
+  @keyframes petalFloat {
+    0% { transform: translateY(-10vh) translateX(0) rotate(0deg); opacity: 0; }
+    15% { opacity: 0.45; }
+    85% { opacity: 0.35; }
+    100% { transform: translateY(110vh) translateX(40px) rotate(360deg); opacity: 0; }
+  }
+
+  @keyframes butterflyFloat {
+    0% { transform: translateY(0) translateX(0) rotate(-8deg); opacity: 0; }
+    20% { opacity: 0.5; }
+    50% { transform: translateY(-26px) translateX(22px) rotate(8deg); opacity: 0.55; }
+    80% { opacity: 0.45; }
+    100% { transform: translateY(60px) translateX(-12px) rotate(-6deg); opacity: 0; }
+  }
+
+  .container {
+    max-width: 640px;
+    margin: 0 auto;
+    border-radius: 24px;
+    padding: 40px 24px 56px;
+    background: linear-gradient(145deg, rgba(255,255,255,0.54), rgba(255,255,255,0.34));
+    border: 1px solid rgba(255,255,255,0.55);
+    box-shadow: 0 16px 42px rgba(158, 142, 189, 0.16), inset 0 1px 0 rgba(255,255,255,0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .header { text-align: center; margin-bottom: 32px; }
+  .sub {
+    color: #6b5b95;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  .title {
+    font-family: "Shippori Mincho", serif;
+    margin: 0 0 12px;
+    font-size: clamp(32px, 7vw, 46px);
+    line-height: 1.3;
+    background: linear-gradient(135deg, #f08bd2 0%, #d28df5 42%, #98a9f3 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .desc {
+    margin: 0;
+    color: #6b6680;
+    font-size: 15px;
+    line-height: 1.8;
+  }
+
+  .card {
+    border-radius: 20px;
+    padding: 28px 24px;
+    background: linear-gradient(150deg, rgba(255,255,255,0.8), rgba(255,255,255,0.66));
+    border: 1px solid rgba(255,255,255,0.7);
+    box-shadow: 0 12px 26px rgba(169, 150, 194, 0.11);
+    backdrop-filter: blur(6px);
+  }
+  .start-screen { text-align: center; }
+
+  .orb {
+    width: 246px;
+    height: 246px;
+    margin: 0 auto 28px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-size: 44px;
+    position: relative;
+    border: none;
+    outline: none;
+    overflow: hidden;
+  }
+  .orb-aurora {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: conic-gradient(
+      from 0deg,
+      #ffc4e8 0deg,
+      #d9b5ff 58deg,
+      #96d9ff 122deg,
+      #9eeec8 182deg,
+      #ffe88e 244deg,
+      #ffbfd9 302deg,
+      #ffc4e8 360deg
+    );
+    box-shadow: 0 0 46px rgba(212, 184, 255, 0.44), 0 0 84px rgba(135, 215, 255, 0.31);
+    animation: auroraSpin 26s linear infinite;
+    filter: saturate(1.2) brightness(1.07) contrast(1.11);
+  }
+  .orb-aurora::before {
+    content: "";
+    position: absolute;
+    inset: -6%;
+    border-radius: 50%;
+    background: conic-gradient(
+      from 180deg,
+      rgba(255, 193, 230, 0.55) 0deg,
+      rgba(173, 203, 255, 0.38) 90deg,
+      rgba(152, 238, 199, 0.42) 180deg,
+      rgba(255, 232, 152, 0.36) 250deg,
+      rgba(255, 193, 230, 0.55) 360deg
+    );
+    mix-blend-mode: screen;
+    filter: blur(10px);
+    animation: auroraDrift 17s ease-in-out infinite reverse;
+  }
+  .orb-flow {
+    position: absolute;
+    inset: 12%;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 28% 30%, rgba(255,255,255,0.5), rgba(255,255,255,0) 55%),
+      conic-gradient(
+        from 90deg,
+        rgba(255, 178, 222, 0.74),
+        rgba(160, 192, 255, 0.62),
+        rgba(151, 241, 202, 0.6),
+        rgba(255, 233, 149, 0.52),
+        rgba(255, 178, 222, 0.74)
+      );
+    filter: blur(8px) saturate(1.14);
+    animation: flowPulse 12s ease-in-out infinite, flowSpin 19s linear infinite;
+  }
+  @keyframes auroraSpin { to { transform: rotate(360deg); } }
+  @keyframes auroraDrift {
+    0%, 100% { transform: scale(1) rotate(0deg); opacity: 0.72; }
+    50% { transform: scale(1.08) rotate(18deg); opacity: 0.92; }
+  }
+  @keyframes flowPulse {
+    0%, 100% { transform: scale(0.94) rotate(0deg); opacity: 0.6; }
+    35% { transform: scale(1.03) rotate(-8deg); opacity: 0.76; }
+    70% { transform: scale(1.1) rotate(-18deg); opacity: 0.9; }
+  }
+  @keyframes flowSpin {
+    from { filter: blur(8px) saturate(1.14) hue-rotate(0deg); }
+    to { filter: blur(8px) saturate(1.14) hue-rotate(12deg); }
+  }
+
+  .orb-heart {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    z-index: 2;
+    animation: heartBeat 2.6s ease-in-out infinite;
+    transform-origin: center;
+  }
+  @keyframes heartBeat {
+    0%, 100% { transform: scale(1); }
+    35% { transform: scale(1.14); }
+    55% { transform: scale(0.98); }
+  }
+
+  .start-text {
+    margin: 0 0 22px;
+    color: #555;
+    font-size: 16px;
+    line-height: 2;
+  }
+  .start-btn {
+    border: none;
+    border-radius: 999px;
+    padding: 16px 46px;
+    background: linear-gradient(135deg, #e7b3cc, #cfa9e8);
+    color: #fff;
+    font-size: 25px;
+    letter-spacing: 2px;
+    font-family: "Shippori Mincho", serif;
+    cursor: pointer;
+    box-shadow: 0 8px 22px rgba(194, 160, 219, 0.36);
+  }
+  .floating-note { margin-top: 12px; color: #999; font-size: 12px; }
+
+  .progress-wrap { margin-bottom: 20px; }
+  .progress-label {
+    display: flex;
+    justify-content: space-between;
+    color: #6b5b95;
+    font-size: 11px;
+    margin-bottom: 8px;
+  }
+  .progress-bar {
+    height: 4px;
+    border-radius: 99px;
+    overflow: hidden;
+    background: rgba(0,0,0,0.09);
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #f39acf, #b9a7ff);
+    transition: width 0.3s ease;
+  }
+  .question-num {
+    color: #c084fc;
+    letter-spacing: 3px;
+    font-size: 11px;
+    margin-bottom: 12px;
+  }
+  .question-text {
+    margin: 0 0 24px;
+    font-size: clamp(18px, 4vw, 22px);
+    line-height: 1.8;
+    font-family: "Shippori Mincho", serif;
+  }
+  .choices { display: grid; gap: 10px; }
+  .choice-btn {
+    border: 1px solid rgba(192,132,252,0.25);
+    border-radius: 14px;
+    background: rgba(250, 247, 253, 0.8);
+    color: #444;
+    padding: 14px 16px;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .choice-btn:hover {
+    border-color: rgba(200,100,220,0.6);
+    background: rgba(238, 222, 251, 0.8);
+  }
+  .choice-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: rgba(240,220,255,0.6);
+    flex: 0 0 auto;
+  }
+
+  .result-card {
+    text-align: center;
+    border-radius: 22px;
+    padding: 34px 24px;
+    background: linear-gradient(150deg, rgba(255,255,255,0.82), rgba(255,255,255,0.64));
+    border: 1px solid rgba(255,255,255,0.72);
+    box-shadow: 0 14px 28px rgba(158, 142, 189, 0.14);
+    backdrop-filter: blur(6px);
+  }
+  .result-label { color: #c084fc; font-size: 11px; letter-spacing: 3px; margin-bottom: 10px; }
+  .result-ball { width: 118px; height: 118px; border-radius: 50%; margin: 0 auto 20px; }
+  .result-name { margin: 0 0 8px; font-size: clamp(28px, 7vw, 38px); font-family: "Shippori Mincho", serif; }
+  .result-sub { color: #555; margin-bottom: 20px; }
+  .result-desc { text-align: left; color: #6b6680; line-height: 1.9; margin-bottom: 14px; }
+  .tags { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 18px; }
+  .tag {
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    color: #7a5a9a;
+    background: rgba(240,220,255,0.45);
+    border: 1px solid rgba(192,132,252,0.32);
+  }
+  .result-oshi {
+    text-align: left;
+    padding: 16px;
+    border-radius: 14px;
+    background: rgba(240,220,255,0.28);
+    border: 1px solid rgba(192,132,252,0.24);
+    color: #7b7294;
+    line-height: 1.8;
+    margin-bottom: 16px;
+  }
+  .retry-btn {
+    width: 100%;
+    border: 1px solid rgba(192,132,252,0.3);
+    border-radius: 14px;
+    padding: 14px;
+    cursor: pointer;
+    background: linear-gradient(135deg, rgba(232,180,232,0.26), rgba(180,212,232,0.26));
+    color: #7a5a9a;
+    font-size: 14px;
+  }
+  .locked-result {
+    position: relative;
+    margin-bottom: 14px;
+    text-align: left;
+    border-radius: 14px;
+    background: rgba(245, 240, 255, 0.35);
+    border: 1px solid rgba(192,132,252,0.2);
+    padding: 16px;
+  }
+  .locked-content {
+    filter: blur(10px);
+    user-select: none;
+    pointer-events: none;
+  }
+  .detail-title {
+    font-size: 13px;
+    color: #7a5a9a;
+    letter-spacing: 0.6px;
+    margin-bottom: 8px;
+  }
+  .detail-list {
+    margin: 0 0 10px 18px;
+    padding: 0;
+    color: #6d6a84;
+    line-height: 1.8;
+  }
+  .detail-lucky {
+    border-radius: 10px;
+    padding: 10px 12px;
+    background: rgba(255,255,255,0.5);
+    color: #6a6780;
+  }
+  .lock-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.4), rgba(255,255,255,0.62));
+    backdrop-filter: blur(3px);
+    text-align: center;
+    padding: 18px;
+  }
+  .lock-icon { font-size: 26px; }
+  .lock-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #4d6f62;
+    letter-spacing: 0.3px;
+  }
+  .line-unlock-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    text-decoration: none;
+    background: #06C755;
+    color: #fff;
+    border-radius: 999px;
+    padding: 12px 20px;
+    font-size: 14px;
+    font-weight: 700;
+    box-shadow: 0 10px 24px rgba(6, 199, 85, 0.38), 0 0 34px rgba(6, 199, 85, 0.3);
+    animation: lineBreath 2.6s ease-in-out infinite;
+  }
+  @keyframes lineBreath {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.06); }
+  }
+`;
+
 export default function App() {
-  const [step, setStep] = useState("top");
-  const [scores, setScores] = useState({ 海風: 0, 夜花: 0, 朝光: 0, 島畑: 0 });
+  const [screen, setScreen] = useState("start");
   const [currentQ, setCurrentQ] = useState(0);
-  const [result, setResult] = useState(null);
-  const [email, setEmail] = useState("");
-  const [emailDone, setEmailDone] = useState(false);
+  const [scores, setScores] = useState(initialScores);
+  const [resultKey, setResultKey] = useState("");
 
-  const handleAnswer = (type) => {
-    const newScores = { ...scores, [type]: scores[type] + 1 };
-    setScores(newScores);
-    if (currentQ + 1 >= QUESTIONS.length) {
-      const top = Object.entries(newScores).sort((a, b) => b[1] - a[1])[0][0];
-      setResult(top);
-      setStep("result");
-    } else {
-      setCurrentQ(currentQ + 1);
-    }
-  };
+  const progress = Math.round((currentQ / questions.length) * 100);
+  const currentQuestion = questions[currentQ];
+  const result = resultKey ? results[resultKey] : null;
 
-  const reset = () => {
-    setStep("top");
-    setScores({ 海風: 0, 夜花: 0, 朝光: 0, 島畑: 0 });
+  const startQuiz = () => {
+    setScreen("quiz");
     setCurrentQ(0);
-    setResult(null);
-    setEmail("");
-    setEmailDone(false);
+    setScores(initialScores);
+    setResultKey("");
   };
 
-  const t = result ? TYPES[result] : null;
+  const selectChoice = (scoreMap) => {
+    const nextScores = { ...scores };
+    Object.entries(scoreMap).forEach(([k, v]) => { nextScores[k] += v; });
+    const nextQ = currentQ + 1;
+    setScores(nextScores);
+    if (nextQ < questions.length) {
+      setCurrentQ(nextQ);
+      return;
+    }
+    const topResultKey = Object.entries(nextScores).sort((a, b) => b[1] - a[1])[0][0];
+    setResultKey(topResultKey);
+    setScreen("result");
+  };
+
+  const resetDiagnosis = () => {
+    setScreen("start");
+    setCurrentQ(0);
+    setScores(initialScores);
+    setResultKey("");
+  };
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      background: "linear-gradient(180deg, #e8f4f8 0%, #f0f8f4 50%, #f8f0f8 100%)",
-      fontFamily: "'Hiragino Mincho ProN', 'Yu Mincho', 'Georgia', serif",
-      color: "#3a3a3a",
-    }}>
-
-      {step === "top" && (
-        <div style={{ maxWidth: 420, margin: "0 auto", padding: "0 24px" }}>
-
-          {/* ヒーローエリア */}
-          <div style={{
-            background: "linear-gradient(160deg, #5ba3c9 0%, #7ec8a0 100%)",
-            borderRadius: "0 0 40px 40px",
-            padding: "60px 28px 48px",
-            textAlign: "center",
-            marginBottom: 32,
-          }}>
-            <div style={{ fontSize: 48, marginBottom: 16 }}>🌊</div>
-            <div style={{
-              fontSize: 10, letterSpacing: "0.4em", color: "rgba(255,255,255,0.8)",
-              marginBottom: 12, textTransform: "uppercase",
-            }}>
-              Shima to Kokoro
-            </div>
-            <h1 style={{
-              fontSize: 22, fontWeight: "bold", lineHeight: 1.7,
-              color: "#fff", margin: "0 0 16px",
-            }}>
-              海と島時間が教えてくれる<br />
-              あなただけの、整え方
-            </h1>
-            <p style={{
-              fontSize: 13, color: "rgba(255,255,255,0.85)",
-              lineHeight: 2, margin: "0 0 32px",
-            }}>
-              忙しい毎日の中でも<br />
-              やさしく自分を整えるための<br />
-              小さなお守りを見つけましょう
-            </p>
-            <button onClick={() => setStep("quiz")} style={{
-              padding: "16px 40px",
-              borderRadius: 99,
-              border: "none",
-              background: "#fff",
-              color: "#5ba3c9",
-              fontSize: 15,
-              fontWeight: "bold",
-              letterSpacing: "0.1em",
-              cursor: "pointer",
-              boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
-            }}>
-              無料診断をはじめる
-            </button>
-          </div>
-
-          {/* タイプ紹介 */}
-          <div style={{ marginBottom: 32 }}>
-            <div style={{
-              fontSize: 11, color: "#8aaaba", letterSpacing: "0.25em",
-              textAlign: "center", marginBottom: 16,
-            }}>
-              4つの整えタイプ
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              {Object.entries(TYPES).map(([name, type]) => (
-                <div key={name} style={{
-                  background: type.lightBg,
-                  borderRadius: 20, padding: "20px 16px",
-                  textAlign: "center",
-                  border: `1px solid ${type.color}30`,
-                }}>
-                  <div style={{ fontSize: 28, marginBottom: 8 }}>{type.emoji}</div>
-                  <div style={{ fontSize: 13, fontWeight: "bold", color: "#2a4050" }}>
-                    {name}タイプ
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* デジタル商品 */}
-          <div style={{
-            background: "#fff",
-            borderRadius: 24, padding: "24px",
-            marginBottom: 40,
-            boxShadow: "0 4px 24px rgba(100,160,200,0.08)",
-            border: "1px solid rgba(180,215,235,0.4)",
-          }}>
-            <div style={{
-              fontSize: 11, color: "#8aaaba", letterSpacing: "0.25em",
-              marginBottom: 16, textAlign: "center",
-            }}>
-              デジタル商品
-            </div>
-            {[
-              { emoji: "✨", name: "有料詳細診断", price: "¥1,500" },
-              { emoji: "🖼️", name: "デジタル壁紙セット", price: "¥800" },
-              { emoji: "📱", name: "スマホ待受", price: "¥500" },
-            ].map(item => (
-              <div key={item.name} style={{
-                display: "flex", alignItems: "center",
-                justifyContent: "space-between",
-                padding: "12px 0",
-                borderBottom: "1px solid rgba(180,215,235,0.3)",
-              }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ fontSize: 20 }}>{item.emoji}</span>
-                  <span style={{ fontSize: 14, color: "#3a5060" }}>{item.name}</span>
-                </div>
-                <span style={{ fontSize: 13, fontWeight: "bold", color: "#7ec8e0" }}>
-                  {item.price}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {step === "quiz" && (
-        <div style={{ maxWidth: 420, margin: "0 auto", padding: "48px 24px" }}>
-          <div style={{ textAlign: "center", marginBottom: 32 }}>
-            <div style={{ display: "flex", justifyContent: "center", gap: 6, marginBottom: 16 }}>
-              {QUESTIONS.map((_, i) => (
-                <div key={i} style={{
-                  width: 32, height: 4, borderRadius: 99,
-                  background: i <= currentQ ? "#7ec8e0" : "#e0edf4",
-                }} />
-              ))}
-            </div>
-            <div style={{ fontSize: 11, color: "#b0c8d8", letterSpacing: "0.2em" }}>
-              質問 {currentQ + 1} / {QUESTIONS.length}
-            </div>
-          </div>
-          <div style={{
-            background: "#fff", borderRadius: 24,
-            padding: "32px 24px",
-            boxShadow: "0 4px 24px rgba(100,160,200,0.08)",
-            border: "1px solid rgba(180,215,235,0.4)",
-          }}>
-            <div style={{
-              fontSize: 17, fontWeight: "bold", color: "#2a4050",
-              lineHeight: 1.7, marginBottom: 28, textAlign: "center",
-            }}>
-              {QUESTIONS[currentQ].q}
-            </div>
-            {QUESTIONS[currentQ].options.map((opt, i) => (
-              <button key={i} onClick={() => handleAnswer(opt.type)} style={{
-                display: "block", width: "100%",
-                padding: "15px 20px", marginBottom: 10,
-                borderRadius: 16,
-                border: "1.5px solid rgba(180,215,235,0.6)",
-                background: "rgba(245,252,255,0.8)",
-                color: "#3a5060", fontSize: 14,
-                cursor: "pointer", textAlign: "left",
-                lineHeight: 1.5,
-              }}>
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {step === "result" && t && (
-        <div style={{ maxWidth: 420, margin: "0 auto", padding: "48px 24px" }}>
-          <div style={{
-            background: t.lightBg, borderRadius: 28,
-            padding: "40px 28px", marginBottom: 16,
-            border: `1.5px solid ${t.color}30`,
-          }}>
-            <div style={{ textAlign: "center", marginBottom: 24 }}>
-              <div style={{ fontSize: 52, marginBottom: 12 }}>{t.emoji}</div>
-              <div style={{ fontSize: 11, color: t.color, letterSpacing: "0.3em", marginBottom: 8 }}>
-                あなたは
-              </div>
-              <div style={{ fontSize: 28, fontWeight: "bold", color: "#2a4050" }}>
-                {result}タイプ
-              </div>
-            </div>
-            <p style={{ fontSize: 14, color: "#5a6a74", lineHeight: 1.9, marginBottom: 20, textAlign: "center" }}>
-              {t.desc}
-            </p>
-            <div style={{ background: "#fff", borderRadius: 16, padding: "16px 20px", marginBottom: 12, border: `1px solid ${t.color}20` }}>
-              <div style={{ fontSize: 11, color: t.color, marginBottom: 6, letterSpacing: "0.15em" }}>今日のひとこと</div>
-              <div style={{ fontSize: 13, color: "#5a6a74", lineHeight: 1.8 }}>{t.action}</div>
-            </div>
-            <div style={{ background: "#fff", borderRadius: 16, padding: "14px 20px", border: `1px solid ${t.color}20` }}>
-              <div style={{ fontSize: 11, color: t.color, marginBottom: 6, letterSpacing: "0.15em" }}>おすすめ</div>
-              <div style={{ fontSize: 13, color: "#5a6a74" }}>{t.suggest}</div>
-            </div>
-          </div>
-          <button onClick={() => setStep("gift")} style={{
-            width: "100%", padding: "15px", borderRadius: 99, border: "none",
-            background: "linear-gradient(135deg, #d4a8c0, #c090a8)",
-            color: "#fff", fontSize: 14, fontWeight: "bold", cursor: "pointer", marginBottom: 12,
-          }}>
-            無料特典を受け取る
-          </button>
-          <button onClick={reset} style={{
-            width: "100%", padding: "12px", borderRadius: 99,
-            border: "1.5px solid rgba(180,215,235,0.6)",
-            background: "transparent", color: "#8aaaba", fontSize: 13, cursor: "pointer",
-          }}>
-            もう一度診断する
-          </button>
-        </div>
-      )}
-
-      {step === "gift" && (
-        <div style={{ maxWidth: 420, margin: "0 auto", padding: "48px 24px" }}>
-          <div style={{
-            background: "#fff", borderRadius: 24, padding: "36px 28px", marginBottom: 16,
-            boxShadow: "0 4px 24px rgba(100,160,200,0.08)",
-            border: "1px solid rgba(180,215,235,0.4)",
-          }}>
-            <div style={{ textAlign: "center", marginBottom: 24 }}>
-              <div style={{ fontSize: 40, marginBottom: 12 }}>🎁</div>
-              <div style={{ fontSize: 11, color: "#8ac0d8", letterSpacing: "0.25em", marginBottom: 8 }}>無料特典</div>
-              <div style={{ fontSize: 18, fontWeight: "bold", color: "#2a4050", lineHeight: 1.6 }}>
-                波照間の海<br />ヒーリングミュージック
-              </div>
-            </div>
-            <p style={{ fontSize: 13, color: "#8a9eaa", lineHeight: 1.9, textAlign: "center", marginBottom: 28 }}>
-              日本最南端・波照間島の海の音。<br />島時間がそっとあなたを包みます。
-            </p>
-            {!emailDone ? (
-              <>
-                <input
-                  type="email" placeholder="メールアドレスを入力"
-                  value={email} onChange={e => setEmail(e.target.value)}
-                  style={{
-                    width: "100%", padding: "14px 18px", borderRadius: 14,
-                    border: "1.5px solid rgba(180,215,235,0.6)",
-                    fontSize: 14, marginBottom: 12,
-                    background: "rgba(245,252,255,0.8)",
-                    color: "#3a5060", boxSizing: "border-box",
-                  }}
-                />
-                <button onClick={() => setEmailDone(true)} style={{
-                  width: "100%", padding: "14px", borderRadius: 99, border: "none",
-                  background: "linear-gradient(135deg, #7ec8e0, #5aaecc)",
-                  color: "#fff", fontSize: 14, fontWeight: "bold", cursor: "pointer",
-                }}>
-                  特典を受け取る
-                </button>
-              </>
-            ) : (
-              <div style={{ textAlign: "center", color: "#5a9e7a", fontSize: 15, fontWeight: "bold" }}>
-                ありがとうございます<br />
-                <span style={{ fontSize: 13, fontWeight: "normal", color: "#8a9eaa" }}>メールをご確認ください</span>
-              </div>
-            )}
-          </div>
-          {emailDone && (
-            <button onClick={() => setStep("shop")} style={{
-              width: "100%", padding: "15px", borderRadius: 99, border: "none",
-              background: "linear-gradient(135deg, #7ab898, #5a9878)",
-              color: "#fff", fontSize: 14, fontWeight: "bold", cursor: "pointer",
-            }}>
-              もっと整えたい方へ
-            </button>
-          )}
-        </div>
-      )}
-
-      {step === "shop" && (
-        <div style={{ maxWidth: 420, margin: "0 auto", padding: "48px 24px" }}>
-          <div style={{ textAlign: "center", marginBottom: 28 }}>
-            <div style={{ fontSize: 11, color: "#8ac0d8", letterSpacing: "0.25em", marginBottom: 8 }}>デジタル商品</div>
-            <div style={{ fontSize: 20, fontWeight: "bold", color: "#2a4050" }}>あなたの整えを、深める</div>
-          </div>
-          {[
-            { emoji: "✨", name: "有料詳細診断", desc: "あなたのタイプをより深く。具体的な整え方と毎日のヒントを詳しくお届け。", price: "¥1,500" },
-            { emoji: "🖼️", name: "デジタル壁紙セット", desc: "4タイプ全ての壁紙。PCとスマホ用セット。", price: "¥800" },
-            { emoji: "📱", name: "スマホ待受", desc: "島時間を毎日感じるための、やさしい待受画像セット。", price: "¥500" },
-          ].map(item => (
-            <div key={item.name} style={{
-              background: "#fff", borderRadius: 20, padding: "20px 22px", marginBottom: 12,
-              boxShadow: "0 2px 16px rgba(100,160,200,0.07)",
-              border: "1px solid rgba(180,215,235,0.4)",
-              display: "flex", gap: 14, alignItems: "center",
-            }}>
-              <div style={{ fontSize: 28 }}>{item.emoji}</div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: "bold", color: "#2a4050", marginBottom: 4 }}>{item.name}</div>
-                <div style={{ fontSize: 12, color: "#8a9eaa", lineHeight: 1.7 }}>{item.desc}</div>
-              </div>
-              <div style={{ fontSize: 13, fontWeight: "bold", color: "#7ec8e0", whiteSpace: "nowrap" }}>{item.price}</div>
-            </div>
+    <>
+      <style>{styles}</style>
+      <div className="page">
+        <div className="float-layer-back">
+          {petals.map((p, idx) => (
+            <span
+              key={`p-${idx}`}
+              className="float-item petal"
+              style={{
+                left: `${petalLanes[idx % petalLanes.length]}%`,
+                animationDuration: `${11 + idx * 1.8}s`,
+                animationDelay: `${idx * 1.1}s`,
+                opacity: 0.17,
+                transform: "scale(0.92)"
+              }}
+            >
+              {p}
+            </span>
+          ))}
+          {butterflies.map((b, idx) => (
+            <span
+              key={`b-${idx}`}
+              className="float-item butterfly"
+              style={{
+                left: `${butterflyLanes[idx % butterflyLanes.length]}%`,
+                top: `${idx % 2 === 0 ? 10 : 78}%`,
+                animationDuration: `${8 + idx * 2.2}s`,
+                animationDelay: `${idx * 1.4}s`,
+                opacity: 0.15,
+                transform: "scale(0.9)"
+              }}
+            >
+              {b}
+            </span>
           ))}
         </div>
-      )}
-    </div>
+        <div className="float-layer-mid">
+          {petals.slice(0, 4).map((p, idx) => (
+            <span
+              key={`mp-${idx}`}
+              className="float-item petal"
+              style={{
+                left: `${idx < 2 ? 10 + idx * 8 : 82 + idx * 4}%`,
+                animationDuration: `${15 + idx * 1.1}s`,
+                animationDelay: `${0.6 + idx * 0.9}s`,
+                opacity: 0.2,
+                transform: "scale(0.95)"
+              }}
+            >
+              {p}
+            </span>
+          ))}
+          {butterflies.slice(0, 2).map((b, idx) => (
+            <span
+              key={`mb-${idx}`}
+              className="float-item butterfly"
+              style={{
+                left: `${idx === 0 ? 8 : 92}%`,
+                top: `${idx === 0 ? 20 : 72}%`,
+                animationDuration: `${12 + idx * 2.1}s`,
+                animationDelay: `${0.8 + idx * 1.3}s`,
+                opacity: 0.19,
+                transform: "scale(0.95)"
+              }}
+            >
+              {b}
+            </span>
+          ))}
+        </div>
+
+        <main className="container">
+          <header className="header">
+            <div className="sub">✦ Color Diagnosis ✦</div>
+            <h1 className="title">推し活💜推し色占い</h1>
+            <p className="desc">
+              あなたの内側に宿る色が、<br />
+              あなたにふさわしい推し色を教えてくれる。
+            </p>
+          </header>
+
+          {screen === "start" && (
+            <section className="card start-screen">
+              <div className="orb">
+                <div className="orb-aurora" />
+                <div className="orb-flow" />
+                <span className="orb-heart">💜</span>
+              </div>
+              <p className="start-text">
+                7つの質問に答えるだけで、<br />
+                あなただけの「推し色」が見つかります。<br />
+                色には感情がある。<br />
+                あなたはどの色に選ばれるのでしょう。
+              </p>
+              <button className="start-btn" onClick={startQuiz}>診断スタート</button>
+              <div className="floating-note">全7問・約1分</div>
+            </section>
+          )}
+
+          {screen === "quiz" && currentQuestion && (
+            <>
+              <div className="progress-wrap">
+                <div className="progress-label">
+                  <span>{`Q${currentQ + 1} / ${questions.length}`}</span>
+                  <span>{`${progress}%`}</span>
+                </div>
+                <div className="progress-bar">
+                  <div className="progress-fill" style={{ width: `${progress}%` }} />
+                </div>
+              </div>
+              <section className="card">
+                <div className="question-num">{`QUESTION ${String(currentQ + 1).padStart(2, "0")}`}</div>
+                <h2 className="question-text">{currentQuestion.text}</h2>
+                <div className="choices">
+                  {currentQuestion.choices.map((choice, idx) => (
+                    <button
+                      key={`${choice.text}-${idx}`}
+                      className="choice-btn"
+                      onClick={() => selectChoice(choice.scores)}
+                    >
+                      <span className="choice-icon">{choice.icon}</span>
+                      <span>{choice.text}</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            </>
+          )}
+
+          {screen === "result" && result && (
+            <section className="result-card">
+              <div className="result-label">YOUR OSHI COLOR</div>
+              <div className="result-ball" style={{ background: result.gradient }} />
+              <h2
+                className="result-name"
+                style={{
+                  background: result.gradient,
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text"
+                }}
+              >
+                {result.name}
+              </h2>
+              <div className="result-sub">{result.sub}</div>
+              <div className="result-oshi">
+                <strong>✦ あなたの推しへのメッセージ</strong>
+                <div>{result.oshi}</div>
+              </div>
+              <div className="locked-result">
+                <div className="locked-content">
+                  <div className="detail-title">✦ 詳細診断・アドバイス</div>
+                  <div className="result-desc">{result.desc}</div>
+                  <ul className="detail-list">
+                    <li>今日の開運アクション: 深呼吸と推し活ルーティン</li>
+                    <li>感情の整え方: 朝と夜で心を切り替える</li>
+                    <li>対人運のポイント: 優しい言葉で流れを呼ぶ</li>
+                  </ul>
+                  <div className="tags">
+                    {result.tags.map((tag) => <span className="tag" key={tag}>{tag}</span>)}
+                  </div>
+                  <div className="detail-lucky">
+                    ラッキーカラー詳細: {result.name} をアクセントにすると運気アップ。
+                  </div>
+                </div>
+                <div className="lock-overlay">
+                  <div className="lock-icon">🔒</div>
+                  <div className="lock-title">詳細な運勢はLINEでチェック</div>
+                  <a
+                    className="line-unlock-btn"
+                    href="https://line.me/R/ti/p/@877xrsvw"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    LINEで詳細をアンロック
+                  </a>
+                </div>
+              </div>
+              <button className="retry-btn" onClick={resetDiagnosis}>もう一度占う</button>
+            </section>
+          )}
+        </main>
+      </div>
+    </>
   );
 }
