@@ -163,6 +163,38 @@ const styles = `
     .header { margin-bottom: 36px; }
   }
 
+  /* 画面高さが低い端末では、初期画面をファーストビュー内に収める */
+  @media (max-height: 820px) {
+    .page {
+      justify-content: flex-start;
+      padding-top: 12px;
+      padding-bottom: 16px;
+    }
+    .container {
+      padding-top: 20px;
+      padding-bottom: 24px;
+    }
+    .header { margin-bottom: 14px; }
+    .card { padding-top: 16px; padding-bottom: 16px; }
+    .orb {
+      width: 214px;
+      height: 214px;
+      margin-bottom: 12px;
+    }
+    .start-text {
+      margin-bottom: 10px;
+      line-height: 1.62;
+      font-size: clamp(14px, 3.7vw, 16px);
+    }
+    .start-btn {
+      min-height: 50px;
+      min-width: 204px;
+      padding: 12px 36px;
+      font-size: clamp(18px, 5vw, 22px);
+    }
+    .floating-note { margin-top: 6px; }
+  }
+
   .header { text-align: center; margin-bottom: 26px; }
   .sub {
     color: #6b5b95;
