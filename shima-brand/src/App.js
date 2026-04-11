@@ -1,4 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
+
+const publicUrl = process.env.PUBLIC_URL || "";
+const VIDEO = {
+  welcome: `${publicUrl}/videos/A_Oshiiro_welcome_1080p.mp4`,
+  mid: `${publicUrl}/videos/B_Oshiiro_Mid_1080p.mp4`,
+  final: `${publicUrl}/videos/C_Oshiiro_Thank_you_and_invite_1080p.mp4`
+};
+const PAID_OSHIIRO_DETAIL_URL = "https://line.me/R/ti/p/@877xrsvw";
 
 const questions = [
   { text: "夜、ひとりでいるとき、自然と何をしていることが多い？", choices: [
@@ -533,23 +541,222 @@ const styles = `
     0%, 100% { transform: scale(1); }
     50% { transform: scale(1.06); }
   }
+
+  .page--immersive {
+    padding: 0;
+    min-height: 100dvh;
+  }
+
+  .video-stage {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(ellipse at 50% 30%, #2a1a3e 0%, #0f0818 55%, #08050e 100%);
+    overflow: hidden;
+  }
+
+  .video-stage--cta {
+    background: radial-gradient(ellipse at 50% 35%, #2d1b45 0%, #0f0818 100%);
+  }
+
+  .video-layer {
+    position: absolute;
+    inset: 0;
+    opacity: 1;
+    transition: opacity 0.55s ease-out;
+  }
+
+  .video-layer--fade {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .video-layer video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center center;
+    display: block;
+  }
+
+  .video-ui {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    padding: 28px 22px;
+    text-align: center;
+    max-width: min(92vw, 380px);
+  }
+
+  .video-hint {
+    margin: 0;
+    color: rgba(255, 255, 255, 0.94);
+    font-size: clamp(15px, 4vw, 17px);
+    line-height: 1.75;
+    text-shadow: 0 2px 18px rgba(0, 0, 0, 0.55);
+  }
+
+  .video-play-btn {
+    border: none;
+    cursor: pointer;
+    border-radius: 999px;
+    padding: 14px 30px;
+    font-size: clamp(15px, 4vw, 17px);
+    font-weight: 700;
+    font-family: inherit;
+    background: linear-gradient(135deg, #f0d4ff, #d4c4ff);
+    color: #3d2a5c;
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.42);
+    min-height: 52px;
+  }
+
+  .welcome-start-btn {
+    border: none;
+    cursor: pointer;
+    border-radius: 999px;
+    padding: 16px 36px;
+    font-size: clamp(16px, 4.2vw, 18px);
+    font-weight: 800;
+    font-family: inherit;
+    background: rgba(255, 255, 255, 0.96);
+    color: #5b3d8a;
+    box-shadow: 0 16px 44px rgba(0, 0, 0, 0.45);
+    min-height: 56px;
+    min-width: 240px;
+    animation: welcomeCtaIn 0.65s ease-out both;
+  }
+
+  @keyframes welcomeCtaIn {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .calc-caption {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: clamp(18px, 6vh, 52px);
+    z-index: 2;
+    margin: 0 auto;
+    padding: 0 20px;
+    text-align: center;
+    font-size: clamp(15px, 4vw, 18px);
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.96);
+    text-shadow: 0 2px 20px rgba(0, 0, 0, 0.65), 0 0 28px rgba(168, 85, 247, 0.35);
+    letter-spacing: 0.04em;
+  }
+
+  .paid-detail-cta-wrap {
+    margin: 18px 0 14px;
+  }
+
+  .paid-detail-cta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    text-decoration: none;
+    border-radius: 16px;
+    padding: 16px 18px;
+    font-size: clamp(15px, 4vw, 17px);
+    font-weight: 800;
+    color: #fff;
+    background: linear-gradient(135deg, #a855f7, #ec4899);
+    box-shadow: 0 14px 38px rgba(168, 85, 247, 0.48);
+    border: 1px solid rgba(255, 255, 255, 0.38);
+    min-height: 56px;
+    line-height: 1.35;
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+  }
+
+  .paid-detail-cta:hover {
+    box-shadow: 0 18px 44px rgba(236, 72, 153, 0.42);
+  }
+
+  .paid-detail-cta:active {
+    transform: scale(0.98);
+  }
+
+  .result-card--reveal {
+    animation: resultReveal 0.55s ease-out both;
+  }
+
+  @keyframes resultReveal {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
 `;
 
 export default function App() {
-  const [screen, setScreen] = useState("start");
+  const [screen, setScreen] = useState("welcome");
+  const [welcomePhase, setWelcomePhase] = useState("prompt");
   const [currentQ, setCurrentQ] = useState(0);
   const [scores, setScores] = useState(initialScores);
   const [resultKey, setResultKey] = useState("");
+  const [midVideoActive, setMidVideoActive] = useState(false);
+
+  const welcomeVideoRef = useRef(null);
+  const midVideoRef = useRef(null);
+  const finalVideoRef = useRef(null);
 
   const progress = Math.round((currentQ / questions.length) * 100);
   const currentQuestion = questions[currentQ];
   const result = resultKey ? results[resultKey] : null;
+
+  const immersive =
+    screen === "welcome" || screen === "calculating" || midVideoActive;
+
+  useEffect(() => {
+    if (welcomePhase !== "playing" && welcomePhase !== "fading") return;
+    const v = welcomeVideoRef.current;
+    if (!v) return;
+    if (welcomePhase === "playing") {
+      v.muted = false;
+      v.currentTime = 0;
+      const p = v.play();
+      if (p && typeof p.catch === "function") p.catch(() => {});
+    }
+  }, [welcomePhase]);
+
+  useEffect(() => {
+    if (!midVideoActive) return;
+    const v = midVideoRef.current;
+    if (!v) return;
+    v.muted = false;
+    v.currentTime = 0;
+    const p = v.play();
+    if (p && typeof p.catch === "function") p.catch(() => {});
+  }, [midVideoActive]);
+
+  useEffect(() => {
+    if (screen !== "calculating") return;
+    const v = finalVideoRef.current;
+    if (!v) return;
+    v.muted = false;
+    v.currentTime = 0;
+    const p = v.play();
+    if (p && typeof p.catch === "function") p.catch(() => {});
+  }, [screen]);
+
+  const handleWelcomeEnded = () => {
+    setWelcomePhase("fading");
+    window.setTimeout(() => setWelcomePhase("cta"), 560);
+  };
 
   const startQuiz = () => {
     setScreen("quiz");
     setCurrentQ(0);
     setScores(initialScores);
     setResultKey("");
+    setMidVideoActive(false);
   };
 
   const selectChoice = (scoreMap) => {
@@ -558,93 +765,102 @@ export default function App() {
     const nextQ = currentQ + 1;
     setScores(nextScores);
     if (nextQ < questions.length) {
+      if (currentQ === 4) {
+        setCurrentQ(5);
+        setMidVideoActive(true);
+        return;
+      }
       setCurrentQ(nextQ);
       return;
     }
     const topResultKey = Object.entries(nextScores).sort((a, b) => b[1] - a[1])[0][0];
     setResultKey(topResultKey);
-    setScreen("result");
+    setScreen("calculating");
   };
 
   const resetDiagnosis = () => {
     setScreen("start");
+    setWelcomePhase("prompt");
     setCurrentQ(0);
     setScores(initialScores);
     setResultKey("");
+    setMidVideoActive(false);
   };
 
   return (
     <>
       <style>{styles}</style>
-      <div className="page">
-        <div className="float-layer-back">
-          {petals.map((p, idx) => (
-            <span
-              key={`p-${idx}`}
-              className="float-item petal"
-              style={{
-                left: `${petalLanes[idx % petalLanes.length]}%`,
-                animationDuration: `${11 + idx * 1.8}s`,
-                animationDelay: `${idx * 1.1}s`,
-                opacity: 0.17,
-                transform: "scale(0.92)"
-              }}
-            >
-              {p}
-            </span>
-          ))}
-          {butterflies.map((b, idx) => (
-            <span
-              key={`b-${idx}`}
-              className="float-item butterfly"
-              style={{
-                left: `${butterflyLanes[idx % butterflyLanes.length]}%`,
-                top: `${idx % 2 === 0 ? 10 : 78}%`,
-                animationDuration: `${8 + idx * 2.2}s`,
-                animationDelay: `${idx * 1.4}s`,
-                opacity: 0.15,
-                transform: "scale(0.9)"
-              }}
-            >
-              {b}
-            </span>
-          ))}
-        </div>
-        <div className="float-layer-mid">
-          {petals.slice(0, 4).map((p, idx) => (
-            <span
-              key={`mp-${idx}`}
-              className="float-item petal"
-              style={{
-                left: `${idx < 2 ? 10 + idx * 8 : 82 + idx * 4}%`,
-                animationDuration: `${15 + idx * 1.1}s`,
-                animationDelay: `${0.6 + idx * 0.9}s`,
-                opacity: 0.2,
-                transform: "scale(0.95)"
-              }}
-            >
-              {p}
-            </span>
-          ))}
-          {butterflies.slice(0, 2).map((b, idx) => (
-            <span
-              key={`mb-${idx}`}
-              className="float-item butterfly"
-              style={{
-                left: `${idx === 0 ? 8 : 92}%`,
-                top: `${idx === 0 ? 20 : 72}%`,
-                animationDuration: `${12 + idx * 2.1}s`,
-                animationDelay: `${0.8 + idx * 1.3}s`,
-                opacity: 0.19,
-                transform: "scale(0.95)"
-              }}
-            >
-              {b}
-            </span>
-          ))}
-        </div>
+      <div className={`page${immersive ? " page--immersive" : ""}`}>
+        {!immersive && (
+          <>
+            <div className="float-layer-back">
+              {petals.map((p, idx) => (
+                <span
+                  key={`p-${idx}`}
+                  className="float-item petal"
+                  style={{
+                    left: `${petalLanes[idx % petalLanes.length]}%`,
+                    animationDuration: `${11 + idx * 1.8}s`,
+                    animationDelay: `${idx * 1.1}s`,
+                    opacity: 0.17,
+                    transform: "scale(0.92)"
+                  }}
+                >
+                  {p}
+                </span>
+              ))}
+              {butterflies.map((b, idx) => (
+                <span
+                  key={`b-${idx}`}
+                  className="float-item butterfly"
+                  style={{
+                    left: `${butterflyLanes[idx % butterflyLanes.length]}%`,
+                    top: `${idx % 2 === 0 ? 10 : 78}%`,
+                    animationDuration: `${8 + idx * 2.2}s`,
+                    animationDelay: `${idx * 1.4}s`,
+                    opacity: 0.15,
+                    transform: "scale(0.9)"
+                  }}
+                >
+                  {b}
+                </span>
+              ))}
+            </div>
+            <div className="float-layer-mid">
+              {petals.slice(0, 4).map((p, idx) => (
+                <span
+                  key={`mp-${idx}`}
+                  className="float-item petal"
+                  style={{
+                    left: `${idx < 2 ? 10 + idx * 8 : 82 + idx * 4}%`,
+                    animationDuration: `${15 + idx * 1.1}s`,
+                    animationDelay: `${0.6 + idx * 0.9}s`,
+                    opacity: 0.2,
+                    transform: "scale(0.95)"
+                  }}
+                >
+                  {p}
+                </span>
+              ))}
+              {butterflies.slice(0, 2).map((b, idx) => (
+                <span
+                  key={`mb-${idx}`}
+                  className="float-item butterfly"
+                  style={{
+                    left: `${idx === 0 ? 8 : 92}%`,
+                    top: `${idx === 0 ? 20 : 72}%`,
+                    animationDuration: `${12 + idx * 2.1}s`,
+                    animationDelay: `${0.8 + idx * 1.3}s`,
+                    opacity: 0.19,
+                    transform: "scale(0.95)"
+                  }}
+                >
+                  {b}
+                </span>
+              ))}
+            </div>
 
-        <main className="container">
+            <main className="container">
           <header className="header">
             <div className="sub">✦ Color Diagnosis ✦</div>
             <h1 className="title">推し活💜推し色占い</h1>
@@ -668,7 +884,7 @@ export default function App() {
             </section>
           )}
 
-          {screen === "quiz" && currentQuestion && (
+          {screen === "quiz" && currentQuestion && !midVideoActive && (
             <>
               <div className="progress-wrap">
                 <div className="progress-label">
@@ -699,7 +915,7 @@ export default function App() {
           )}
 
           {screen === "result" && result && (
-            <section className="result-card">
+            <section className="result-card result-card--reveal">
               <div className="result-label">YOUR OSHI COLOR</div>
               <div className="result-ball" style={{ background: result.gradient }} />
               <h2
@@ -717,6 +933,16 @@ export default function App() {
               <div className="result-oshi">
                 <strong>✦ あなたの推しへのメッセージ</strong>
                 <div>{result.oshi}</div>
+              </div>
+              <div className="paid-detail-cta-wrap">
+                <a
+                  className="paid-detail-cta"
+                  href={PAID_OSHIIRO_DETAIL_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  300円の詳しいおしいろ診断へ進む
+                </a>
               </div>
               <div className="locked-result">
                 <div className="locked-content">
@@ -750,7 +976,69 @@ export default function App() {
               <button className="retry-btn" onClick={resetDiagnosis}>もう一度占う</button>
             </section>
           )}
-        </main>
+            </main>
+          </>
+        )}
+
+        {screen === "welcome" && (
+          <div className={`video-stage${welcomePhase === "cta" ? " video-stage--cta" : ""}`}>
+            {(welcomePhase === "playing" || welcomePhase === "fading") && (
+              <div className={`video-layer${welcomePhase === "fading" ? " video-layer--fade" : ""}`}>
+                <video
+                  ref={welcomeVideoRef}
+                  src={VIDEO.welcome}
+                  playsInline
+                  preload="auto"
+                  onEnded={handleWelcomeEnded}
+                />
+              </div>
+            )}
+            {welcomePhase === "prompt" && (
+              <div className="video-ui">
+                <p className="video-hint">音声をオンにしてお楽しみください</p>
+                <button type="button" className="video-play-btn" onClick={() => setWelcomePhase("playing")}>
+                  動画を再生する
+                </button>
+              </div>
+            )}
+            {welcomePhase === "cta" && (
+              <div className="video-ui">
+                <button type="button" className="welcome-start-btn" onClick={() => setScreen("start")}>
+                  診断を始める
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {screen === "quiz" && midVideoActive && (
+          <div className="video-stage">
+            <div className="video-layer">
+              <video
+                ref={midVideoRef}
+                src={VIDEO.mid}
+                playsInline
+                preload="auto"
+                onEnded={() => setMidVideoActive(false)}
+              />
+            </div>
+          </div>
+        )}
+
+        {screen === "calculating" && (
+          <div className="video-stage">
+            <div className="video-layer">
+              <video
+                ref={finalVideoRef}
+                src={VIDEO.final}
+                playsInline
+                preload="auto"
+                onEnded={() => setScreen("result")}
+              />
+            </div>
+            <p className="calc-caption">結果を導き出しています...</p>
+          </div>
+        )}
       </div>
     </>
   );
