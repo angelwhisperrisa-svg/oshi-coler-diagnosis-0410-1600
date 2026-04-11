@@ -559,7 +559,10 @@ const styles = `
   }
 
   .video-stage--welcome {
-    background: #0c0614;
+    background:
+      radial-gradient(circle at 22% 18%, rgba(249, 242, 255, 0.12) 0%, transparent 42%),
+      radial-gradient(circle at 78% 82%, rgba(238, 247, 255, 0.08) 0%, transparent 45%),
+      radial-gradient(ellipse at 50% 40%, #1f1430 0%, #0f0818 52%, #050308 100%);
   }
 
   .video-layer {
@@ -582,13 +585,15 @@ const styles = `
     display: block;
   }
 
-  .video-stage--welcome .video-layer video {
+  .video-stage--welcome .video-layer--welcome video {
+    object-fit: cover;
     object-position: center center;
   }
 
   @media (min-width: 768px) {
-    .video-stage--welcome .video-layer video {
-      object-position: center top;
+    .video-stage--welcome .video-layer--welcome video {
+      object-fit: contain;
+      object-position: center center;
     }
   }
 
@@ -603,12 +608,27 @@ const styles = `
     position: absolute;
     left: 0;
     right: 0;
-    bottom: clamp(56px, 16vh, 140px);
+    top: 72%;
+    bottom: auto;
+    transform: translateY(-50%);
     z-index: 3;
     display: flex;
     justify-content: center;
     padding: 0 20px;
     pointer-events: none;
+  }
+
+  @media (max-width: 767px) {
+    .welcome-overlay {
+      top: 76%;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .welcome-overlay {
+      top: 70%;
+      padding: 0 clamp(20px, 4vw, 48px);
+    }
   }
 
   .welcome-glass-btn {
@@ -730,6 +750,7 @@ export default function App() {
   const midVideoRef = useRef(null);
   const finalVideoRef = useRef(null);
   const welcomeExitTimerRef = useRef(null);
+  const welcomeEngagedRef = useRef(false);
 
   const progress = Math.round((currentQ / questions.length) * 100);
   const currentQuestion = questions[currentQ];
@@ -773,6 +794,7 @@ export default function App() {
   }, [screen]);
 
   const handleWelcomeSoundOn = () => {
+    welcomeEngagedRef.current = true;
     const v = welcomeVideoRef.current;
     setWelcomeMuted(false);
     if (v) {
@@ -783,10 +805,14 @@ export default function App() {
   };
 
   const handleWelcomeEnded = () => {
+    const v = welcomeVideoRef.current;
+    if (!welcomeEngagedRef.current) return;
+    if (!v || v.muted) return;
     if (welcomeExitTimerRef.current) window.clearTimeout(welcomeExitTimerRef.current);
     setWelcomeExiting(true);
     welcomeExitTimerRef.current = window.setTimeout(() => {
       welcomeExitTimerRef.current = null;
+      welcomeEngagedRef.current = false;
       setScreen("start");
       setWelcomeExiting(false);
       setWelcomeMuted(true);
