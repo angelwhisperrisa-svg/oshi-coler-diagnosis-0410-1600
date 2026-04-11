@@ -3,7 +3,6 @@ import React, { useState, useRef, useEffect } from "react";
 const publicUrl = process.env.PUBLIC_URL || "";
 const VIDEO = {
   welcome: `${publicUrl}/videos/A_Oshiiro_welcome_1080p.mp4`,
-  mid: `${publicUrl}/videos/B_Oshiiro_Mid_1080p.mp4`,
   final: `${publicUrl}/videos/C_Oshiiro_Thank_you_and_invite_1080p.mp4`
 };
 const PAID_OSHIIRO_DETAIL_URL = "https://line.me/R/ti/p/@877xrsvw";
@@ -744,20 +743,17 @@ export default function App() {
   const [currentQ, setCurrentQ] = useState(0);
   const [scores, setScores] = useState(initialScores);
   const [resultKey, setResultKey] = useState("");
-  const [midVideoActive, setMidVideoActive] = useState(false);
-
   const welcomeVideoRef = useRef(null);
-  const midVideoRef = useRef(null);
   const finalVideoRef = useRef(null);
   const welcomeExitTimerRef = useRef(null);
+  const welcomeSilentSkipTimerRef = useRef(null);
   const welcomeEngagedRef = useRef(false);
 
   const progress = Math.round((currentQ / questions.length) * 100);
   const currentQuestion = questions[currentQ];
   const result = resultKey ? results[resultKey] : null;
 
-  const immersive =
-    screen === "welcome" || screen === "calculating" || midVideoActive;
+  const immersive = screen === "welcome" || screen === "calculating";
 
   useEffect(() => {
     if (screen !== "welcome") return undefined;
@@ -769,19 +765,33 @@ export default function App() {
     return undefined;
   }, [screen, welcomeMuted]);
 
+  useEffect(() => {
+    if (screen !== "welcome") {
+      if (welcomeSilentSkipTimerRef.current) {
+        window.clearTimeout(welcomeSilentSkipTimerRef.current);
+        welcomeSilentSkipTimerRef.current = null;
+      }
+      return undefined;
+    }
+    welcomeSilentSkipTimerRef.current = window.setTimeout(() => {
+      welcomeSilentSkipTimerRef.current = null;
+      if (welcomeEngagedRef.current) return;
+      setScreen("start");
+      setWelcomeMuted(true);
+      setWelcomeExiting(false);
+    }, 5000);
+    return () => {
+      if (welcomeSilentSkipTimerRef.current) {
+        window.clearTimeout(welcomeSilentSkipTimerRef.current);
+        welcomeSilentSkipTimerRef.current = null;
+      }
+    };
+  }, [screen]);
+
   useEffect(() => () => {
     if (welcomeExitTimerRef.current) window.clearTimeout(welcomeExitTimerRef.current);
+    if (welcomeSilentSkipTimerRef.current) window.clearTimeout(welcomeSilentSkipTimerRef.current);
   }, []);
-
-  useEffect(() => {
-    if (!midVideoActive) return;
-    const v = midVideoRef.current;
-    if (!v) return;
-    v.muted = false;
-    v.currentTime = 0;
-    const p = v.play();
-    if (p && typeof p.catch === "function") p.catch(() => {});
-  }, [midVideoActive]);
 
   useEffect(() => {
     if (screen !== "calculating") return;
@@ -794,11 +804,16 @@ export default function App() {
   }, [screen]);
 
   const handleWelcomeSoundOn = () => {
+    if (welcomeSilentSkipTimerRef.current) {
+      window.clearTimeout(welcomeSilentSkipTimerRef.current);
+      welcomeSilentSkipTimerRef.current = null;
+    }
     welcomeEngagedRef.current = true;
     const v = welcomeVideoRef.current;
     setWelcomeMuted(false);
     if (v) {
       v.muted = false;
+      v.currentTime = 0;
       const p = v.play();
       if (p && typeof p.catch === "function") p.catch(() => {});
     }
@@ -824,7 +839,6 @@ export default function App() {
     setCurrentQ(0);
     setScores(initialScores);
     setResultKey("");
-    setMidVideoActive(false);
   };
 
   const selectChoice = (scoreMap) => {
@@ -833,11 +847,6 @@ export default function App() {
     const nextQ = currentQ + 1;
     setScores(nextScores);
     if (nextQ < questions.length) {
-      if (currentQ === 4) {
-        setCurrentQ(5);
-        setMidVideoActive(true);
-        return;
-      }
       setCurrentQ(nextQ);
       return;
     }
@@ -853,7 +862,6 @@ export default function App() {
     setCurrentQ(0);
     setScores(initialScores);
     setResultKey("");
-    setMidVideoActive(false);
   };
 
   return (
@@ -953,7 +961,7 @@ export default function App() {
             </section>
           )}
 
-          {screen === "quiz" && currentQuestion && !midVideoActive && (
+          {screen === "quiz" && currentQuestion && (
             <>
               <div className="progress-wrap">
                 <div className="progress-label">
@@ -1068,20 +1076,6 @@ export default function App() {
               <button type="button" className="welcome-glass-btn" onClick={handleWelcomeSoundOn}>
                 音声をオンにして診断を始める 🔘
               </button>
-            </div>
-          </div>
-        )}
-
-        {screen === "quiz" && midVideoActive && (
-          <div className="video-stage">
-            <div className="video-layer">
-              <video
-                ref={midVideoRef}
-                src={VIDEO.mid}
-                playsInline
-                preload="auto"
-                onEnded={() => setMidVideoActive(false)}
-              />
             </div>
           </div>
         )}
