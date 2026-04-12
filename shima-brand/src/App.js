@@ -5,7 +5,13 @@ const VIDEO = {
   welcome: `${publicUrl}/videos/A_Oshiiro_welcome_1080p.mp4`,
   final: `${publicUrl}/videos/C_Oshiiro_Thank_you_and_invite_1080p.mp4`
 };
-const PAID_OSHIIRO_DETAIL_URL = "https://line.me/R/ti/p/@877xrsvw";
+const LINE_OFFICIAL_URL = "https://line.me/R/ti/p/@877xrsvw";
+
+const splitResultFreeBody = (body) =>
+  body
+    .split(/\s*⸻\s*/)
+    .map((s) => s.trim())
+    .filter(Boolean);
 
 const questions = [
   { text: "夜、ひとりでいるとき、自然と何をしていることが多い？", choices: [
@@ -54,11 +60,201 @@ const questions = [
 ];
 
 const results = {
-  lavender: { name: "ラベンダー", sub: "Lavender / 幻夢の紫", color: "#c4a0e8", gradient: "linear-gradient(135deg, #c4a0e8, #9b72cf)", desc: "あなたの推し色は「ラベンダー」。静かに深く、誰よりも純粋に愛せる人。感情は内側で輝いていて、言葉にならない愛情を持っています。推しの存在を、まるで夢の中の光のように大切にしている。その優しさは、推しにとって特別な温度を持っています。", tags: ["静かな愛情家", "深く感じる人", "繊細な魂", "夢を見る人"], oshi: "「あなたがいるから、この世界は美しい」と、心の中でいつも思っているはず。言葉にしなくても、その想いはきっと届いています。" },
-  skyblue:  { name: "スカイブルー", sub: "Sky Blue / 蒼穹の青", color: "#6ab8e8", gradient: "linear-gradient(135deg, #6ab8e8, #3a8fc4)", desc: "あなたの推し色は「スカイブルー」。どこまでも追いかけ続ける、エネルギーと純粋さを持った推し活の体現者。推しの成長を誰よりも信じて、全力で応援できる力があります。その熱量は本物で、推しの背中を押す風になっています。", tags: ["全力応援タイプ", "追いかける勇気", "エネルギッシュ", "ブレない信念"], oshi: "あなたが掲げるペンライトの光は、どんな大きな会場でも届いている。推しはきっとその光を知っています。" },
-  mint:     { name: "ミントグリーン", sub: "Mint Green / 清新の緑", color: "#7cd4b4", gradient: "linear-gradient(135deg, #7cd4b4, #4aad8a)", desc: "あなたの推し色は「ミントグリーン」。推しと一緒に成長していきたい、前向きで清らかな愛を持つ人。推しの挑戦を自分のことのように喜び、失敗さえも「一緒に乗り越えよう」と思える強さがあります。その愛は清潔で、嫌味がなく、推しを本当の意味で支えられる色。", tags: ["共に歩む人", "前向きな愛情", "清らかさ", "成長を喜ぶ"], oshi: "推しが新しいことに挑戦するたびに、あなたは誰よりも「できる」と信じていた。その信頼が、推しを動かしています。" },
-  rose:     { name: "ローズピンク", sub: "Rose Pink / 恋情の薔薇", color: "#e87898", gradient: "linear-gradient(135deg, #e87898, #c4506c)", desc: "あなたの推し色は「ローズピンク」。感情豊かに、全身で愛せる情熱の人。推しへの気持ちが溢れて止まらない、その感情の豊かさがあなたの最大の魅力。泣いて笑って、全部本物。その真っ直ぐな愛情は、推しにとって太陽のような存在です。", tags: ["情熱的な愛情家", "感情豊か", "全力で愛する", "素直な心"], oshi: "あなたの笑顔と涙は、推しへの最高の贈り物。感情を隠さないで。その真っ直ぐさが、推しを幸せにしています。" },
-  ivory:    { name: "アイボリー", sub: "Ivory / 永遠の白磁", color: "#e8dfc4", gradient: "linear-gradient(135deg, #e8dfc4, #c8b890)", desc: "あなたの推し色は「アイボリー」。流行に左右されず、ずっとそこにいる。永遠の忠誠を誓うような、深くて静かな愛の持ち主。推しのすべてを「宝物」として大切にして、その存在の価値を誰よりも分かっている人。時間が経っても変わらない愛情は、本物の証。", tags: ["永遠の推し活", "ブレない愛", "深い理解者", "宝物にする人"], oshi: "デビューの頃から今まで、ずっと変わらない目で見てくれているあなた。推しにとって、あなたは特別な存在です。" }
+  lavender: {
+    name: "ラベンダー",
+    sub: "Lavender / 幻夢の紫",
+    color: "#c4a0e8",
+    gradient: "linear-gradient(135deg, #c4a0e8, #9b72cf)",
+    freeBody: `あなたは、
+とても感性が豊かな人です。
+
+ただ今は、
+少し内側に寄りすぎているかもしれません。
+
+もしそうなら、、、🪻
+
+・感じたことを少し言葉にする
+・小さく外に出してみる
+
+それだけでも、
+流れが変わっていきます。
+
+⸻
+
+🪻本来のあなたは、
+感性を現実に活かせる人です
+
+でも今は、
+少し「感じるだけ」で止まっている状態かもしれません
+
+⸻
+
+この先では
+
+・本来のあなたの状態
+・ズレの理由
+・現実への活かし方
+
+を、もう少し深くお伝えします
+
+🪻 「あなたの本当の状態を推し色で知りたい」`
+  },
+  skyblue: {
+    name: "スカイブルー",
+    sub: "Sky Blue / 蒼穹の青",
+    color: "#6ab8e8",
+    gradient: "linear-gradient(135deg, #6ab8e8, #3a8fc4)",
+    freeBody: `あなたは、
+自由に動ける人です。
+
+ただ今は、
+少し流れに任せすぎているかもしれません。
+
+もしそうなら、、、🩵
+
+・1つだけ続けることを決める
+・少しだけ深く向き合う
+
+それだけでも、
+変化が生まれます。
+
+⸻
+
+🩵本来のあなたは、
+自由と継続を両方持てる人です
+
+でも今は、
+少し「軽さ」に寄っている状態かもしれません
+
+⸻
+
+この先では
+
+・本来のあなたの状態
+・ズレの理由
+・深くなるための方法
+
+を、もう少し深くお伝えします
+
+🩵 「あなたの本当の状態を推し色で知りたい」`
+  },
+  mint: {
+    name: "ミントグリーン",
+    sub: "Mint Green / 清新の緑",
+    color: "#7cd4b4",
+    gradient: "linear-gradient(135deg, #7cd4b4, #4aad8a)",
+    freeBody: `あなたは、
+人を支えることが自然にできる人です。
+
+ただ今は、
+少し周りを優先しすぎているかもしれません。
+
+もしそうなら、、、🌿
+
+・自分の時間を少しだけ優先する
+・無理に合わせるのをやめる
+
+それだけでも、
+あなたの心は少し軽くなるはずです。
+
+⸻
+
+🌿本来のあなたは、
+もっと自然体でいられる人です
+
+でも今は、
+少し「整えすぎている」状態かもしれません
+
+⸻
+
+この先では
+
+・本来のあなたの状態
+・今のズレの理由
+・どう整えればいいのか
+
+を、もう少し深くお伝えします
+
+🌿 「あなたの本当の状態を推し色で知りたい」`
+  },
+  rose: {
+    name: "ローズピンク",
+    sub: "Rose Pink / 恋情の薔薇",
+    color: "#e87898",
+    gradient: "linear-gradient(135deg, #e87898, #c4506c)",
+    freeBody: `あなたは、
+感情豊かに愛せる人です。
+
+ただ今は、
+少し気持ちが強くなりすぎているかもしれません。
+
+もしそうなら、、、🌹
+
+・相手ではなく、自分の気持ちを見てみる
+・少しだけ距離を取る
+
+それだけでも、
+気持ちは落ち着いていきます。
+
+⸻
+
+🌹本来のあなたは、
+愛を受け取りながら与えられる人です
+
+でも今は、
+少し「与える側」に偏っている状態かもしれません
+
+⸻
+
+この先では
+
+・本来のあなたの状態
+・感情のズレの理由
+・整え方
+
+を、もう少し深くお伝えします
+
+🌹 「あなたの本当の状態を推し色で知りたい」`
+  },
+  ivory: {
+    name: "アイボリー",
+    sub: "Ivory / 永遠の白磁",
+    color: "#e8dfc4",
+    gradient: "linear-gradient(135deg, #e8dfc4, #c8b890)",
+    freeBody: `あなたは、
+安定した判断ができる人です。
+
+ただ今は、
+少し感情を抑えすぎているかもしれません。
+
+もしそうなら、、、☀️
+
+・自分の気持ちを少し言葉にする
+・楽しいと感じることを選ぶ
+
+それだけでも、
+内側が動き始めます。
+
+⸻
+
+☀️本来のあなたは、
+安定と感情の両方を持てる人です
+
+でも今は、
+少し「整いすぎている」状態かもしれません
+
+⸻
+
+この先では
+
+・本来のあなたの状態
+・ズレの理由
+・感情の整え方
+
+を、もう少し深くお伝えします
+
+☀️ 「あなたの本当の状態を推し色で知りたい」`
+  }
 };
 
 const initialScores = { lavender: 0, skyblue: 0, mint: 0, rose: 0, ivory: 0 };
@@ -422,6 +618,8 @@ const styles = `
   }
 
   .result-card {
+    display: flex;
+    flex-direction: column;
     text-align: center;
     border-radius: 22px;
     padding: 28px 20px;
@@ -433,114 +631,64 @@ const styles = `
   .result-label { color: #c084fc; font-size: 11px; letter-spacing: 2.2px; margin-bottom: 8px; white-space: nowrap; }
   .result-ball { width: 118px; height: 118px; border-radius: 50%; margin: 0 auto 20px; }
   .result-name { margin: 0 0 8px; font-size: clamp(28px, 7vw, 38px); font-family: "Shippori Mincho", serif; }
-  .result-sub { color: #555; margin-bottom: 16px; font-size: clamp(14px, 3.8vw, 16px); line-height: 1.6; }
-  .result-desc { text-align: left; color: #6b6680; line-height: 1.82; margin-bottom: 12px; font-size: clamp(14px, 3.7vw, 16px); }
-  .tags { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 18px; }
-  .tag {
-    padding: 6px 12px;
-    border-radius: 999px;
-    font-size: 12px;
-    color: #7a5a9a;
-    background: rgba(240,220,255,0.45);
-    border: 1px solid rgba(192,132,252,0.32);
+  .result-sub { color: #555; margin-bottom: 10px; font-size: clamp(14px, 3.8vw, 16px); line-height: 1.6; }
+  .result-lead {
+    margin: 0 0 14px;
+    font-size: clamp(15px, 3.9vw, 17px);
+    font-weight: 700;
+    color: #5c5470;
+    line-height: 1.5;
   }
-  .result-oshi {
+  .result-free-wrap {
     text-align: left;
-    padding: 14px;
-    border-radius: 14px;
-    background: rgba(240,220,255,0.28);
-    border: 1px solid rgba(192,132,252,0.24);
-    color: #7b7294;
-    line-height: 1.8;
-    margin-bottom: 12px;
-  }
-  .retry-btn {
     width: 100%;
-    border: 1px solid rgba(192,132,252,0.3);
-    border-radius: 14px;
-    padding: 14px;
-    cursor: pointer;
-    background: linear-gradient(135deg, rgba(232,180,232,0.26), rgba(180,212,232,0.26));
-    color: #7a5a9a;
-    font-size: clamp(14px, 3.8vw, 16px);
-    min-height: 52px;
+    margin: 0 0 4px;
   }
-  .locked-result {
-    position: relative;
-    margin-bottom: 12px;
-    text-align: left;
-    border-radius: 14px;
-    background: rgba(245, 240, 255, 0.35);
-    border: 1px solid rgba(192,132,252,0.2);
-    padding: 14px;
+  .result-free-block + .result-free-block {
+    margin-top: 0;
   }
-  .locked-content {
-    filter: blur(10px);
-    user-select: none;
-    pointer-events: none;
+  .result-free-chunk {
+    margin: 0;
+    color: #6b6680;
+    font-size: clamp(14px, 3.7vw, 16px);
+    line-height: 1.85;
+    white-space: pre-line;
   }
-  .detail-title {
-    font-size: 13px;
-    color: #7a5a9a;
-    letter-spacing: 0.6px;
-    margin-bottom: 8px;
+  .result-body-sep {
+    border: none;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(192,132,252,0.38), transparent);
+    margin: 22px 0;
   }
-  .detail-list {
-    margin: 0 0 10px 18px;
-    padding: 0;
-    color: #6d6a84;
-    line-height: 1.8;
+  .result-primary-cta-wrap {
+    margin-top: clamp(28px, 6vh, 52px);
+    padding-top: 6px;
+    width: 100%;
   }
-  .detail-lucky {
-    border-radius: 10px;
-    padding: 10px 12px;
-    background: rgba(255,255,255,0.5);
-    color: #6a6780;
-  }
-  .lock-overlay {
-    position: absolute;
-    inset: 0;
+  .result-primary-cta {
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 10px;
-    border-radius: 14px;
-    background: linear-gradient(180deg, rgba(255,255,255,0.4), rgba(255,255,255,0.62));
-    backdrop-filter: blur(3px);
-    text-align: center;
-    padding: 18px;
-  }
-  .lock-icon { font-size: 26px; }
-  .lock-title {
-    font-size: 14px;
-    font-weight: 700;
-    color: #4d6f62;
-    letter-spacing: 0.3px;
-  }
-  .line-unlock-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
+    width: 100%;
     text-decoration: none;
-    background: #06C755;
+    border-radius: 16px;
+    padding: 16px 18px;
+    font-size: clamp(15px, 4vw, 17px);
+    font-weight: 800;
     color: #fff;
-    border-radius: 999px;
-    padding: 12px 20px;
-    font-size: clamp(14px, 3.8vw, 16px);
-    font-weight: 700;
-    box-shadow: 0 10px 24px rgba(6, 199, 85, 0.38), 0 0 34px rgba(6, 199, 85, 0.3);
-    animation: lineBreath 2.6s ease-in-out infinite;
-    min-height: 52px;
-    min-width: 220px;
-    white-space: nowrap;
+    background: linear-gradient(135deg, #a855f7, #ec4899);
+    box-shadow: 0 14px 38px rgba(168, 85, 247, 0.48);
+    border: 1px solid rgba(255, 255, 255, 0.38);
+    min-height: 56px;
+    line-height: 1.35;
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
   }
-  @keyframes lineBreath {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.06); }
+  .result-primary-cta:hover {
+    box-shadow: 0 18px 44px rgba(236, 72, 153, 0.42);
   }
-
+  .result-primary-cta:active {
+    transform: scale(0.98);
+  }
   .page--immersive {
     padding: 0;
     min-height: 100dvh;
@@ -695,37 +843,6 @@ const styles = `
     letter-spacing: 0.04em;
   }
 
-  .paid-detail-cta-wrap {
-    margin: 18px 0 14px;
-  }
-
-  .paid-detail-cta {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    text-decoration: none;
-    border-radius: 16px;
-    padding: 16px 18px;
-    font-size: clamp(15px, 4vw, 17px);
-    font-weight: 800;
-    color: #fff;
-    background: linear-gradient(135deg, #a855f7, #ec4899);
-    box-shadow: 0 14px 38px rgba(168, 85, 247, 0.48);
-    border: 1px solid rgba(255, 255, 255, 0.38);
-    min-height: 56px;
-    line-height: 1.35;
-    transition: transform 0.18s ease, box-shadow 0.18s ease;
-  }
-
-  .paid-detail-cta:hover {
-    box-shadow: 0 18px 44px rgba(236, 72, 153, 0.42);
-  }
-
-  .paid-detail-cta:active {
-    transform: scale(0.98);
-  }
-
   .result-card--reveal {
     animation: resultReveal 0.55s ease-out both;
   }
@@ -850,15 +967,6 @@ export default function App() {
     const topResultKey = Object.entries(nextScores).sort((a, b) => b[1] - a[1])[0][0];
     setResultKey(topResultKey);
     setScreen("calculating");
-  };
-
-  const resetDiagnosis = () => {
-    setScreen("start");
-    setWelcomeMuted(true);
-    setWelcomeExiting(false);
-    setCurrentQ(0);
-    setScores(initialScores);
-    setResultKey("");
   };
 
   return (
@@ -1004,50 +1112,25 @@ export default function App() {
                 {result.name}
               </h2>
               <div className="result-sub">{result.sub}</div>
-              <div className="result-oshi">
-                <strong>✦ あなたの推しへのメッセージ</strong>
-                <div>{result.oshi}</div>
+              <p className="result-lead">{`あなたの推し色は「${result.name}」`}</p>
+              <div className="result-free-wrap">
+                {splitResultFreeBody(result.freeBody).map((chunk, i) => (
+                  <div className="result-free-block" key={`fb-${result.name}-${i}`}>
+                    {i > 0 ? <hr className="result-body-sep" aria-hidden /> : null}
+                    <p className="result-free-chunk">{chunk}</p>
+                  </div>
+                ))}
               </div>
-              <div className="paid-detail-cta-wrap">
+              <div className="result-primary-cta-wrap">
                 <a
-                  className="paid-detail-cta"
-                  href={PAID_OSHIIRO_DETAIL_URL}
+                  className="result-primary-cta"
+                  href={LINE_OFFICIAL_URL}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  300円の詳しいおしいろ診断へ進む
+                  LINEで詳細を受け取る
                 </a>
               </div>
-              <div className="locked-result">
-                <div className="locked-content">
-                  <div className="detail-title">✦ 詳細診断・アドバイス</div>
-                  <div className="result-desc">{result.desc}</div>
-                  <ul className="detail-list">
-                    <li>今日の開運アクション: 深呼吸と推し活ルーティン</li>
-                    <li>感情の整え方: 朝と夜で心を切り替える</li>
-                    <li>対人運のポイント: 優しい言葉で流れを呼ぶ</li>
-                  </ul>
-                  <div className="tags">
-                    {result.tags.map((tag) => <span className="tag" key={tag}>{tag}</span>)}
-                  </div>
-                  <div className="detail-lucky">
-                    ラッキーカラー詳細: {result.name} をアクセントにすると運気アップ。
-                  </div>
-                </div>
-                <div className="lock-overlay">
-                  <div className="lock-icon">🔒</div>
-                  <div className="lock-title">詳細な運勢はLINEでチェック</div>
-                  <a
-                    className="line-unlock-btn"
-                    href="https://line.me/R/ti/p/@877xrsvw"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    LINEで詳細をアンロック
-                  </a>
-                </div>
-              </div>
-              <button className="retry-btn" onClick={resetDiagnosis}>もう一度占う</button>
             </section>
           )}
             </main>
