@@ -660,34 +660,84 @@ const styles = `
     background: linear-gradient(90deg, transparent, rgba(192,132,252,0.38), transparent);
     margin: 22px 0;
   }
-  .result-primary-cta-wrap {
-    margin-top: clamp(28px, 6vh, 52px);
-    padding-top: 6px;
-    width: 100%;
+  .locked-result {
+    position: relative;
+    margin: 20px 0 0;
+    text-align: left;
+    border-radius: 16px;
+    background: rgba(245, 240, 255, 0.4);
+    border: 1px solid rgba(192, 132, 252, 0.28);
+    padding: 16px 14px;
+    min-height: min(240px, 42vh);
+    overflow: hidden;
   }
-  .result-primary-cta {
+  .locked-content {
+    filter: blur(9px);
+    user-select: none;
+    pointer-events: none;
+    opacity: 0.92;
+  }
+  .lock-overlay {
+    position: absolute;
+    inset: 0;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    width: 100%;
+    gap: 12px;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0.58));
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    text-align: center;
+    padding: 20px 16px;
+  }
+  .lock-icon { font-size: 32px; line-height: 1; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.12)); }
+  .lock-title {
+    font-size: clamp(13px, 3.6vw, 15px);
+    font-weight: 700;
+    color: #3d5a4f;
+    letter-spacing: 0.02em;
+    line-height: 1.45;
+    max-width: 280px;
+  }
+  .line-unlock-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     text-decoration: none;
-    border-radius: 16px;
-    padding: 16px 18px;
-    font-size: clamp(15px, 4vw, 17px);
-    font-weight: 800;
+    background: #06C755;
     color: #fff;
-    background: linear-gradient(135deg, #a855f7, #ec4899);
-    box-shadow: 0 14px 38px rgba(168, 85, 247, 0.48);
-    border: 1px solid rgba(255, 255, 255, 0.38);
-    min-height: 56px;
-    line-height: 1.35;
-    transition: transform 0.18s ease, box-shadow 0.18s ease;
+    border-radius: 999px;
+    padding: 14px 24px;
+    font-size: clamp(14px, 3.8vw, 16px);
+    font-weight: 700;
+    box-shadow: 0 10px 28px rgba(6, 199, 85, 0.42), 0 0 36px rgba(6, 199, 85, 0.28);
+    animation: lineBreath 2.6s ease-in-out infinite;
+    min-height: 52px;
+    min-width: min(92vw, 260px);
+    white-space: nowrap;
+    transition: transform 0.18s ease;
   }
-  .result-primary-cta:hover {
-    box-shadow: 0 18px 44px rgba(236, 72, 153, 0.42);
-  }
-  .result-primary-cta:active {
+  .line-unlock-btn:active {
     transform: scale(0.98);
+  }
+  @keyframes lineBreath {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+  }
+  .retry-btn {
+    width: 100%;
+    border: 1px solid rgba(192,132,252,0.3);
+    border-radius: 14px;
+    padding: 14px;
+    cursor: pointer;
+    background: linear-gradient(135deg, rgba(232,180,232,0.26), rgba(180,212,232,0.26));
+    color: #7a5a9a;
+    font-size: clamp(14px, 3.8vw, 16px);
+    min-height: 52px;
+    margin-top: 16px;
+    font-family: inherit;
   }
   .page--immersive {
     padding: 0;
@@ -740,7 +790,7 @@ const styles = `
   @media (min-width: 768px) {
     .video-stage--welcome .video-layer--welcome video {
       object-fit: contain;
-      object-position: center center;
+      object-position: center top;
     }
   }
 
@@ -969,6 +1019,72 @@ export default function App() {
     setScreen("calculating");
   };
 
+  const resetDiagnosis = () => {
+    setScreen("start");
+    setWelcomeMuted(true);
+    setWelcomeExiting(false);
+    setCurrentQ(0);
+    setScores(initialScores);
+    setResultKey("");
+  };
+
+  const renderOshiResultCard = (res) => {
+    const freeChunks = splitResultFreeBody(res.freeBody);
+    const teaserChunks = freeChunks.slice(0, 1);
+    const lockedChunks = freeChunks.slice(1);
+    return (
+      <section className="result-card result-card--reveal">
+        <div className="result-label">YOUR OSHI COLOR</div>
+        <div className="result-ball" style={{ background: res.gradient }} />
+        <h2
+          className="result-name"
+          style={{
+            background: res.gradient,
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text"
+          }}
+        >
+          {res.name}
+        </h2>
+        <div className="result-sub">{res.sub}</div>
+        <p className="result-lead">{`あなたの推し色は「${res.name}」`}</p>
+        <div className="result-free-wrap">
+          {teaserChunks.map((chunk, i) => (
+            <div className="result-free-block" key={`teaser-${res.name}-${i}`}>
+              <p className="result-free-chunk">{chunk}</p>
+            </div>
+          ))}
+        </div>
+        {lockedChunks.length > 0 ? (
+          <div className="locked-result">
+            <div className="locked-content" aria-hidden>
+              {lockedChunks.map((chunk, i) => (
+                <div className="result-free-block" key={`lock-${res.name}-${i}`}>
+                  {i > 0 ? <hr className="result-body-sep" /> : null}
+                  <p className="result-free-chunk">{chunk}</p>
+                </div>
+              ))}
+            </div>
+            <div className="lock-overlay">
+              <div className="lock-icon" aria-hidden>🔒</div>
+              <div className="lock-title">詳細な運勢はLINEでチェック</div>
+              <a
+                className="line-unlock-btn"
+                href={LINE_OFFICIAL_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                LINEで詳細をアンロック
+              </a>
+            </div>
+          </div>
+        ) : null}
+        <button type="button" className="retry-btn" onClick={resetDiagnosis}>もう一度占う</button>
+      </section>
+    );
+  };
+
   return (
     <>
       <style>{styles}</style>
@@ -1096,43 +1212,7 @@ export default function App() {
             </>
           )}
 
-          {screen === "result" && result && (
-            <section className="result-card result-card--reveal">
-              <div className="result-label">YOUR OSHI COLOR</div>
-              <div className="result-ball" style={{ background: result.gradient }} />
-              <h2
-                className="result-name"
-                style={{
-                  background: result.gradient,
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text"
-                }}
-              >
-                {result.name}
-              </h2>
-              <div className="result-sub">{result.sub}</div>
-              <p className="result-lead">{`あなたの推し色は「${result.name}」`}</p>
-              <div className="result-free-wrap">
-                {splitResultFreeBody(result.freeBody).map((chunk, i) => (
-                  <div className="result-free-block" key={`fb-${result.name}-${i}`}>
-                    {i > 0 ? <hr className="result-body-sep" aria-hidden /> : null}
-                    <p className="result-free-chunk">{chunk}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="result-primary-cta-wrap">
-                <a
-                  className="result-primary-cta"
-                  href={LINE_OFFICIAL_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  LINEで詳細を受け取る
-                </a>
-              </div>
-            </section>
-          )}
+          {screen === "result" && result && renderOshiResultCard(result)}
             </main>
           </>
         )}
