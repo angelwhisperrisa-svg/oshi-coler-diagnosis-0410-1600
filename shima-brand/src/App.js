@@ -13,6 +13,18 @@ const splitResultFreeBody = (body) =>
     .map((s) => s.trim())
     .filter(Boolean);
 
+/** 無料表示は「もしそうなら、、、」まで。以降（最初の「・」アドバイスから）をロック */
+const splitTeaserAndLocked = (body) => {
+  const idx = body.search(/\n\n・/);
+  if (idx === -1) {
+    const chunks = splitResultFreeBody(body);
+    return { teaser: chunks[0] || "", lockedChunks: chunks.slice(1) };
+  }
+  const teaser = body.slice(0, idx).trim();
+  const lockedPart = body.slice(idx + 2).trim();
+  return { teaser, lockedChunks: splitResultFreeBody(lockedPart) };
+};
+
 const questions = [
   { text: "夜、ひとりでいるとき、自然と何をしていることが多い？", choices: [
     { icon: "🎵", text: "音楽を聴きながら、ぼーっとしている", scores: { lavender: 2, skyblue: 1 } },
@@ -726,18 +738,33 @@ const styles = `
     0%, 100% { transform: scale(1); }
     50% { transform: scale(1.05); }
   }
-  .retry-btn {
+  .result-retry-row {
+    display: flex;
+    justify-content: flex-end;
     width: 100%;
-    border: 1px solid rgba(192,132,252,0.3);
-    border-radius: 14px;
-    padding: 14px;
+    margin-top: 10px;
+  }
+  .retry-btn {
+    width: auto;
+    max-width: 100%;
+    border: none;
+    border-radius: 8px;
+    padding: 4px 2px 4px 8px;
     cursor: pointer;
-    background: linear-gradient(135deg, rgba(232,180,232,0.26), rgba(180,212,232,0.26));
-    color: #7a5a9a;
-    font-size: clamp(14px, 3.8vw, 16px);
-    min-height: 52px;
-    margin-top: 16px;
+    background: transparent;
+    color: #9a8ab0;
+    font-size: clamp(11px, 2.9vw, 12px);
+    font-weight: 500;
+    min-height: 0;
+    line-height: 1.35;
     font-family: inherit;
+    text-align: right;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    opacity: 0.92;
+  }
+  .retry-btn:hover {
+    color: #7a6a96;
   }
   .page--immersive {
     padding: 0;
@@ -789,6 +816,23 @@ const styles = `
 
   @media (min-width: 768px) {
     .video-stage--welcome .video-layer--welcome video {
+      object-fit: contain;
+      object-position: center top;
+    }
+  }
+
+  .video-stage--final {
+    background:
+      radial-gradient(circle at 22% 18%, rgba(249, 242, 255, 0.12) 0%, transparent 42%),
+      radial-gradient(circle at 78% 82%, rgba(238, 247, 255, 0.08) 0%, transparent 45%),
+      radial-gradient(ellipse at 50% 40%, #1f1430 0%, #0f0818 52%, #050308 100%);
+  }
+  .video-stage--final .video-layer--final video {
+    object-fit: cover;
+    object-position: center center;
+  }
+  @media (min-width: 768px) {
+    .video-stage--final .video-layer--final video {
       object-fit: contain;
       object-position: center top;
     }
@@ -1029,9 +1073,7 @@ export default function App() {
   };
 
   const renderOshiResultCard = (res) => {
-    const freeChunks = splitResultFreeBody(res.freeBody);
-    const teaserChunks = freeChunks.slice(0, 1);
-    const lockedChunks = freeChunks.slice(1);
+    const { teaser, lockedChunks } = splitTeaserAndLocked(res.freeBody);
     return (
       <section className="result-card result-card--reveal">
         <div className="result-label">YOUR OSHI COLOR</div>
@@ -1050,11 +1092,9 @@ export default function App() {
         <div className="result-sub">{res.sub}</div>
         <p className="result-lead">{`あなたの推し色は「${res.name}」`}</p>
         <div className="result-free-wrap">
-          {teaserChunks.map((chunk, i) => (
-            <div className="result-free-block" key={`teaser-${res.name}-${i}`}>
-              <p className="result-free-chunk">{chunk}</p>
-            </div>
-          ))}
+          <div className="result-free-block">
+            <p className="result-free-chunk">{teaser}</p>
+          </div>
         </div>
         {lockedChunks.length > 0 ? (
           <div className="locked-result">
@@ -1068,7 +1108,7 @@ export default function App() {
             </div>
             <div className="lock-overlay">
               <div className="lock-icon" aria-hidden>🔒</div>
-              <div className="lock-title">詳細な運勢はLINEでチェック</div>
+              <div className="lock-title">詳細な推し色診断はLINEでチェック</div>
               <a
                 className="line-unlock-btn"
                 href={LINE_OFFICIAL_URL}
@@ -1080,7 +1120,11 @@ export default function App() {
             </div>
           </div>
         ) : null}
-        <button type="button" className="retry-btn" onClick={resetDiagnosis}>もう一度占う</button>
+        <div className="result-retry-row">
+          <button type="button" className="retry-btn" onClick={resetDiagnosis}>
+            もう一度、推し色を見つける
+          </button>
+        </div>
       </section>
     );
   };
@@ -1241,8 +1285,8 @@ export default function App() {
         )}
 
         {screen === "calculating" && (
-          <div className="video-stage">
-            <div className="video-layer">
+          <div className="video-stage video-stage--final">
+            <div className="video-layer video-layer--final">
               <video
                 ref={finalVideoRef}
                 src={VIDEO.final}
