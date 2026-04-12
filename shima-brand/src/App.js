@@ -6,24 +6,31 @@ const VIDEO = {
   final: `${publicUrl}/videos/C_Oshiiro_Thank_you_and_invite_1080p.mp4`
 };
 const LINE_OFFICIAL_URL = "https://line.me/R/ti/p/@877xrsvw";
+const BASE_FULL_URL = process.env.REACT_APP_BASE_FULL_URL || "https://thebase.in/";
 
-const splitResultFreeBody = (body) =>
-  body
-    .split(/\s*⸻\s*/)
-    .map((s) => s.trim())
-    .filter(Boolean);
+const RESULT_TYPE_KEYS = ["mint", "rose", "lavender", "ivory", "skyblue"];
 
-/** 無料表示は「もしそうなら、、、」まで。以降（最初の「・」アドバイスから）をロック */
-const splitTeaserAndLocked = (body) => {
-  const idx = body.search(/\n\n・/);
-  if (idx === -1) {
-    const chunks = splitResultFreeBody(body);
-    return { teaser: chunks[0] || "", lockedChunks: chunks.slice(1) };
+function parseInitialResultRoute() {
+  if (typeof window === "undefined") {
+    return { showResult: false, resultType: null, modeFull: false };
   }
-  const teaser = body.slice(0, idx).trim();
-  const lockedPart = body.slice(idx + 2).trim();
-  return { teaser, lockedChunks: splitResultFreeBody(lockedPart) };
-};
+  const path = (window.location.pathname || "/").replace(/\/$/, "") || "/";
+  const isResultPath = path === "/result" || path.endsWith("/result");
+  if (!isResultPath) {
+    return { showResult: false, resultType: null, modeFull: false };
+  }
+  const params = new URLSearchParams(window.location.search);
+  const type = params.get("type");
+  const mode = params.get("mode");
+  if (!type || !RESULT_TYPE_KEYS.includes(type)) {
+    return { showResult: false, resultType: null, modeFull: false };
+  }
+  return {
+    showResult: true,
+    resultType: type,
+    modeFull: mode === "full"
+  };
+}
 
 const questions = [
   { text: "夜、ひとりでいるとき、自然と何をしていることが多い？", choices: [
@@ -72,200 +79,93 @@ const questions = [
 ];
 
 const results = {
-  lavender: {
-    name: "ラベンダー",
-    sub: "Lavender / 幻夢の紫",
-    color: "#c4a0e8",
-    gradient: "linear-gradient(135deg, #c4a0e8, #9b72cf)",
-    freeBody: `あなたは、
-とても感性が豊かな人です。
-
-ただ今は、
-少し内側に寄りすぎているかもしれません。
-
-もしそうなら、、、🪻
-
-・感じたことを少し言葉にする
-・小さく外に出してみる
-
-それだけでも、
-流れが変わっていきます。
-
-⸻
-
-🪻本来のあなたは、
-感性を現実に活かせる人です
-
-でも今は、
-少し「感じるだけ」で止まっている状態かもしれません
-
-⸻
-
-この先では
-
-・本来のあなたの状態
-・ズレの理由
-・現実への活かし方
-
-を、もう少し深くお伝えします
-
-🪻 「あなたの本当の状態を推し色で知りたい」`
-  },
-  skyblue: {
-    name: "スカイブルー",
-    sub: "Sky Blue / 蒼穹の青",
-    color: "#6ab8e8",
-    gradient: "linear-gradient(135deg, #6ab8e8, #3a8fc4)",
-    freeBody: `あなたは、
-自由に動ける人です。
-
-ただ今は、
-少し流れに任せすぎているかもしれません。
-
-もしそうなら、、、🩵
-
-・1つだけ続けることを決める
-・少しだけ深く向き合う
-
-それだけでも、
-変化が生まれます。
-
-⸻
-
-🩵本来のあなたは、
-自由と継続を両方持てる人です
-
-でも今は、
-少し「軽さ」に寄っている状態かもしれません
-
-⸻
-
-この先では
-
-・本来のあなたの状態
-・ズレの理由
-・深くなるための方法
-
-を、もう少し深くお伝えします
-
-🩵 「あなたの本当の状態を推し色で知りたい」`
-  },
   mint: {
     name: "ミントグリーン",
     sub: "Mint Green / 清新の緑",
     color: "#7cd4b4",
     gradient: "linear-gradient(135deg, #7cd4b4, #4aad8a)",
-    freeBody: `あなたは、
-人を支えることが自然にできる人です。
-
-ただ今は、
-少し周りを優先しすぎているかもしれません。
-
-もしそうなら、、、🌿
+    teaserFree: "あなたは、人を支えることが自然にできる人です。ただ今は、少し周りを優先しすぎているかもしれません。もしそうなら、、、",
+    hookBeforeLock: "この先では、本来の状態、ズレの理由、整え方を具体的にお伝えします。",
+    lockedBody: `・自分の時間を少しだけ優先する
+・無理に合わせるのをやめる
+それだけでも、あなたの心は少し軽くなるはずです。
+本来のあなたは、もっと自然体でいられる人です。でも今は、少し「整えすぎている」状態かもしれません。`,
+    fullBody: `あなたは、人を支えることが自然にできる人です。ただ今は、少し周りを優先しすぎているかもしれません。もしそうなら、、、
 
 ・自分の時間を少しだけ優先する
 ・無理に合わせるのをやめる
-
-それだけでも、
-あなたの心は少し軽くなるはずです。
-
-⸻
-
-🌿本来のあなたは、
-もっと自然体でいられる人です
-
-でも今は、
-少し「整えすぎている」状態かもしれません
-
-⸻
-
-この先では
-
-・本来のあなたの状態
-・今のズレの理由
-・どう整えればいいのか
-
-を、もう少し深くお伝えします
-
-🌿 「あなたの本当の状態を推し色で知りたい」`
+それだけでも、あなたの心は少し軽くなるはずです。
+本来のあなたは、もっと自然体でいられる人です。でも今は、少し「整えすぎている」状態かもしれません。この先では、本来の状態、ズレの理由、整え方を具体的にお伝えします。`
   },
   rose: {
     name: "ローズピンク",
     sub: "Rose Pink / 恋情の薔薇",
     color: "#e87898",
     gradient: "linear-gradient(135deg, #e87898, #c4506c)",
-    freeBody: `あなたは、
-感情豊かに愛せる人です。
+    teaserFree: "あなたは、感情豊かに愛せる人です。ただ今は、少し気持ちが強くなりすぎているかもしれません。もしそうなら、、、",
+    hookBeforeLock: "この先では、感情のズレの理由、整え方を具体的にお伝えします。",
+    lockedBody: `・相手ではなく、自分の気持ちを見てみる
+・少しだけ距離を取る
+それだけでも、気持ちは落ち着いていきます。
 
-ただ今は、
-少し気持ちが強くなりすぎているかもしれません。
-
-もしそうなら、、、🌹
-
+本来のあなたは、愛を受け取りながら与えられる人です。でも今は、少し「与える側」に偏っている状態かもしれません。`,
+    fullBody: `あなたは、感情豊かに愛せる人です。ただ今は、少し気持ちが強くなりすぎているかもしれません。もしそうなら、、、
 ・相手ではなく、自分の気持ちを見てみる
 ・少しだけ距離を取る
+それだけでも、気持ちは落ち着いていきます。
 
-それだけでも、
-気持ちは落ち着いていきます。
-
-⸻
-
-🌹本来のあなたは、
-愛を受け取りながら与えられる人です
-
-でも今は、
-少し「与える側」に偏っている状態かもしれません
-
-⸻
-
-この先では
-
-・本来のあなたの状態
-・感情のズレの理由
-・整え方
-
-を、もう少し深くお伝えします
-
-🌹 「あなたの本当の状態を推し色で知りたい」`
+本来のあなたは、愛を受け取りながら与えられる人です。でも今は、少し「与える側」に偏っている状態かもしれません。この先では、感情のズレの理由、整え方を具体的にお伝えします。`
+  },
+  lavender: {
+    name: "ラベンダー",
+    sub: "Lavender / 幻夢の紫",
+    color: "#c4a0e8",
+    gradient: "linear-gradient(135deg, #c4a0e8, #9b72cf)",
+    teaserFree: "あなたは、とても感性が豊かな人です。ただ今は、少し内側に寄りすぎているかもしれません。もしそうなら、、、",
+    hookBeforeLock: "この先では、ズレの理由、現実への活かし方を具体的にお伝えします。",
+    lockedBody: `・感じたことを少し言葉にする
+・小さく外に出してみる
+それだけでも、流れが変わっていきます。
+本来のあなたは、感性を現実に活かせる人です。でも今は、少し「感じるだけ」で止まっている状態かもしれません。`,
+    fullBody: `あなたは、とても感性が豊かな人です。ただ今は、少し内側に寄りすぎているかもしれません。もしそうなら、、、
+・感じたことを少し言葉にする
+・小さく外に出してみる
+それだけでも、流れが変わっていきます。
+本来のあなたは、感性を現実に活かせる人です。でも今は、少し「感じるだけ」で止まっている状態かもしれません。この先では、ズレの理由、現実への活かし方を具体的にお伝えします。`
   },
   ivory: {
     name: "アイボリー",
     sub: "Ivory / 永遠の白磁",
     color: "#e8dfc4",
     gradient: "linear-gradient(135deg, #e8dfc4, #c8b890)",
-    freeBody: `あなたは、
-安定した判断ができる人です。
-
-ただ今は、
-少し感情を抑えすぎているかもしれません。
-
-もしそうなら、、、☀️
-
+    teaserFree: "あなたは、安定した判断ができる人です。ただ今は、少し感情を抑えすぎているかもしれません。もしそうなら、、、",
+    hookBeforeLock: "この先では、ズレの理由、感情の整え方を具体的にお伝えします。",
+    lockedBody: `・自分の気持ちを少し言葉にする
+・楽しいと感じることを選ぶ
+それだけでも、内側が動き始めます。
+本来のあなたは、安定と感情の両方を持てる人です。でも今は、少し「整いすぎている」状態かもしれません。`,
+    fullBody: `あなたは、安定した判断ができる人です。ただ今は、少し感情を抑えすぎているかもしれません。もしそうなら、、、
 ・自分の気持ちを少し言葉にする
 ・楽しいと感じることを選ぶ
-
-それだけでも、
-内側が動き始めます。
-
-⸻
-
-☀️本来のあなたは、
-安定と感情の両方を持てる人です
-
-でも今は、
-少し「整いすぎている」状態かもしれません
-
-⸻
-
-この先では
-
-・本来のあなたの状態
-・ズレの理由
-・感情の整え方
-
-を、もう少し深くお伝えします
-
-☀️ 「あなたの本当の状態を推し色で知りたい」`
+それだけでも、内側が動き始めます。
+本来のあなたは、安定と感情の両方を持てる人です。でも今は、少し「整いすぎている」状態かもしれません。この先では、ズレの理由、感情の整え方を具体的にお伝えします。`
+  },
+  skyblue: {
+    name: "スカイブルー",
+    sub: "Sky Blue / 蒼穹の青",
+    color: "#6ab8e8",
+    gradient: "linear-gradient(135deg, #6ab8e8, #3a8fc4)",
+    teaserFree: "あなたは、自由に動ける人です。ただ今は、少し流れに任せすぎているかもしれません。もしそうなら、、、",
+    hookBeforeLock: "この先では、ズレの理由、深くなるための方法を具体的にお伝えします。",
+    lockedBody: `・1つだけ続けることを決める
+・少しだけ深く向き合う
+それだけでも、変化が生まれます。
+本来のあなたは、自由と継続を両方持てる人です。でも今は、少し「軽さ」に寄っている状態かもしれません。`,
+    fullBody: `あなたは、自由に動ける人です。ただ今は、少し流れに任せすぎているかもしれません。もしそうなら、、、
+・1つだけ続けることを決める
+・少しだけ深く向き合う
+それだけでも、変化が生まれます。
+本来のあなたは、自由と継続を両方持てる人です。でも今は、少し「軽さ」に寄っている状態かもしれません。この先では、ズレの理由、深くなるための方法を具体的にお伝えします。`
   }
 };
 
@@ -666,6 +566,42 @@ const styles = `
     line-height: 1.85;
     white-space: pre-line;
   }
+  .result-hook {
+    margin: 14px 0 0;
+    text-align: left;
+    font-size: clamp(14px, 3.7vw, 16px);
+    font-weight: 700;
+    color: #5c5470;
+    line-height: 1.75;
+  }
+  .result-base-cta-wrap {
+    margin-top: clamp(24px, 5vh, 40px);
+    width: 100%;
+  }
+  .result-base-cta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    text-decoration: none;
+    border-radius: 16px;
+    padding: 16px 18px;
+    font-size: clamp(15px, 4vw, 17px);
+    font-weight: 800;
+    color: #fff;
+    background: linear-gradient(135deg, #4f46e5, #9333ea);
+    box-shadow: 0 14px 36px rgba(79, 70, 229, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    min-height: 56px;
+    line-height: 1.35;
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+  }
+  .result-base-cta:hover {
+    box-shadow: 0 18px 42px rgba(147, 51, 234, 0.38);
+  }
+  .result-base-cta:active {
+    transform: scale(0.98);
+  }
   .result-body-sep {
     border: none;
     height: 1px;
@@ -948,12 +884,16 @@ const styles = `
 `;
 
 export default function App() {
-  const [screen, setScreen] = useState("welcome");
+  const initialRoute = parseInitialResultRoute();
+  const [screen, setScreen] = useState(initialRoute.showResult ? "result" : "welcome");
   const [welcomeMuted, setWelcomeMuted] = useState(true);
   const [welcomeExiting, setWelcomeExiting] = useState(false);
   const [currentQ, setCurrentQ] = useState(0);
   const [scores, setScores] = useState(initialScores);
-  const [resultKey, setResultKey] = useState("");
+  const [resultKey, setResultKey] = useState(initialRoute.showResult ? initialRoute.resultType : "");
+  const [resultModeFull, setResultModeFull] = useState(
+    Boolean(initialRoute.showResult && initialRoute.modeFull)
+  );
   const welcomeVideoRef = useRef(null);
   const finalVideoRef = useRef(null);
   const welcomeExitTimerRef = useRef(null);
@@ -1060,22 +1000,30 @@ export default function App() {
     }
     const topResultKey = Object.entries(nextScores).sort((a, b) => b[1] - a[1])[0][0];
     setResultKey(topResultKey);
+    setResultModeFull(false);
     setScreen("calculating");
   };
 
   const resetDiagnosis = () => {
+    if (typeof window !== "undefined") {
+      const path = (window.location.pathname || "").replace(/\/$/, "") || "/";
+      if (path === "/result" || path.endsWith("/result")) {
+        const base = (publicUrl || "").replace(/\/$/, "");
+        window.history.replaceState({}, "", `${base}/` || "/");
+      }
+    }
     setScreen("start");
     setWelcomeMuted(true);
     setWelcomeExiting(false);
     setCurrentQ(0);
     setScores(initialScores);
     setResultKey("");
+    setResultModeFull(false);
   };
 
-  const renderOshiResultCard = (res) => {
-    const { teaser, lockedChunks } = splitTeaserAndLocked(res.freeBody);
-    return (
-      <section className="result-card result-card--reveal">
+  const renderOshiResultCard = (res, isFull) => {
+    const header = (
+      <>
         <div className="result-label">YOUR OSHI COLOR</div>
         <div className="result-ball" style={{ background: res.gradient }} />
         <h2
@@ -1091,35 +1039,63 @@ export default function App() {
         </h2>
         <div className="result-sub">{res.sub}</div>
         <p className="result-lead">{`あなたの推し色は「${res.name}」`}</p>
+      </>
+    );
+
+    if (isFull) {
+      return (
+        <section className="result-card result-card--reveal">
+          {header}
+          <div className="result-free-wrap">
+            <div className="result-free-block">
+              <p className="result-free-chunk">{res.fullBody}</p>
+            </div>
+          </div>
+          <div className="result-base-cta-wrap">
+            <a
+              className="result-base-cta"
+              href={BASE_FULL_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              BASE：フル鑑定
+            </a>
+          </div>
+          <div className="result-retry-row">
+            <button type="button" className="retry-btn" onClick={resetDiagnosis}>
+              もう一度、推し色を見つける
+            </button>
+          </div>
+        </section>
+      );
+    }
+
+    return (
+      <section className="result-card result-card--reveal">
+        {header}
         <div className="result-free-wrap">
           <div className="result-free-block">
-            <p className="result-free-chunk">{teaser}</p>
+            <p className="result-free-chunk">{res.teaserFree}</p>
           </div>
         </div>
-        {lockedChunks.length > 0 ? (
-          <div className="locked-result">
-            <div className="locked-content" aria-hidden>
-              {lockedChunks.map((chunk, i) => (
-                <div className="result-free-block" key={`lock-${res.name}-${i}`}>
-                  {i > 0 ? <hr className="result-body-sep" /> : null}
-                  <p className="result-free-chunk">{chunk}</p>
-                </div>
-              ))}
-            </div>
-            <div className="lock-overlay">
-              <div className="lock-icon" aria-hidden>🔒</div>
-              <div className="lock-title">詳細な推し色診断はLINEでチェック</div>
-              <a
-                className="line-unlock-btn"
-                href={LINE_OFFICIAL_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                LINEで詳細をアンロック
-              </a>
-            </div>
+        <p className="result-hook">{res.hookBeforeLock}</p>
+        <div className="locked-result">
+          <div className="locked-content" aria-hidden>
+            <p className="result-free-chunk">{res.lockedBody}</p>
           </div>
-        ) : null}
+          <div className="lock-overlay">
+            <div className="lock-icon" aria-hidden>🔒</div>
+            <div className="lock-title">詳細な推し色診断はLINEでチェック</div>
+            <a
+              className="line-unlock-btn"
+              href={LINE_OFFICIAL_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              LINEで詳細をアンロック
+            </a>
+          </div>
+        </div>
         <div className="result-retry-row">
           <button type="button" className="retry-btn" onClick={resetDiagnosis}>
             もう一度、推し色を見つける
@@ -1256,7 +1232,7 @@ export default function App() {
             </>
           )}
 
-          {screen === "result" && result && renderOshiResultCard(result)}
+          {screen === "result" && result && renderOshiResultCard(result, resultModeFull)}
             </main>
           </>
         )}
