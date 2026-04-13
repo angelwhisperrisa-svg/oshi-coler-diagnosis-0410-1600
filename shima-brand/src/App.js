@@ -42,6 +42,21 @@ function getBaseShopUrlForType(typeKey) {
   return map[typeKey] || process.env.REACT_APP_BASE_FULL_URL || BASE_FULL_URL;
 }
 
+/**
+ * リッチメニュー等で開いても `liff.isInClient()` が false になる端末がある。
+ * User-Agent で LINE 内蔵ブラウザを拾い、ログイン・友だち確認フローに進める。
+ */
+function isLikelyLineInAppBrowser() {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  return (
+    /Line\//i.test(ua) ||
+    /; line\//i.test(ua) ||
+    /liff/i.test(ua) ||
+    /\bLINE\b/.test(ua)
+  );
+}
+
 function parseInitialResultRoute() {
   if (typeof window === "undefined") {
     return { showResult: false, resultType: null, modeFull: false };
@@ -1085,7 +1100,8 @@ export default function App() {
         await liff.init({ liffId: REACT_APP_LIFF_ID, withLoginOnExternalBrowser: true });
         if (cancelled) return;
         liffRef.current = liff;
-        if (!liff.isInClient()) {
+        const inLineUi = liff.isInClient() || isLikelyLineInAppBrowser();
+        if (!inLineUi) {
           setLineAccess("external");
           return;
         }
@@ -1095,8 +1111,14 @@ export default function App() {
         }
         let friendFlag = false;
         if (typeof liff.getFriendship === "function") {
-          const fs = await liff.getFriendship();
-          friendFlag = Boolean(fs.friendFlag);
+          try {
+            const fs = await liff.getFriendship();
+            friendFlag = Boolean(fs.friendFlag);
+          } catch {
+            friendFlag = true;
+          }
+        } else {
+          friendFlag = true;
         }
         if (!friendFlag) {
           setLineAccess("friend");
@@ -1252,7 +1274,8 @@ export default function App() {
         const liff = (await import("@line/liff")).default;
         await liff.init({ liffId: REACT_APP_LIFF_ID, withLoginOnExternalBrowser: true });
         if (cancelled) return;
-        if (!liff.isInClient() || !liff.isLoggedIn()) return;
+        const inLineUi = liff.isInClient() || isLikelyLineInAppBrowser();
+        if (!inLineUi || !liff.isLoggedIn()) return;
         const idToken = liff.getIDToken();
         if (!idToken) return;
 
