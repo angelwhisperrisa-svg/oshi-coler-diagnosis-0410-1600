@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
 
 const publicUrl = process.env.PUBLIC_URL || "";
 const VIDEO = {
@@ -10,6 +10,37 @@ const BASE_FULL_URL = process.env.REACT_APP_BASE_FULL_URL || "https://thebase.in
 
 const RESULT_TYPE_KEYS = ["mint", "rose", "lavender", "ivory", "skyblue"];
 const REACT_APP_LIFF_ID = process.env.REACT_APP_LIFF_ID || "";
+const LINE_BRAND = "薫凛香房 公式LINE";
+const DEV_LINE_GATE_BYPASS =
+  process.env.NODE_ENV === "development" && process.env.REACT_APP_DEV_LINE_BYPASS === "1";
+
+function getLineQrSrc() {
+  const custom = process.env.REACT_APP_LINE_QR_IMAGE_URL;
+  if (custom) return custom;
+  return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=8&data=${encodeURIComponent(LINE_OFFICIAL_URL)}`;
+}
+
+/** 回答スコアのみで判定。同点時は固定の優先順（URLには依存しない） */
+function computeResultFromScores(sc) {
+  const max = Math.max(...RESULT_TYPE_KEYS.map((k) => sc[k] || 0));
+  const tops = RESULT_TYPE_KEYS.filter((k) => sc[k] === max);
+  if (tops.length === 1) return tops[0];
+  const tieOrder = ["mint", "rose", "lavender", "ivory", "skyblue"];
+  return tieOrder.find((k) => tops.includes(k)) || tops[0];
+}
+
+/** 各色のBASE（フル鑑定）リンク。未設定時は共通 REACT_APP_BASE_FULL_URL */
+function getBaseShopUrlForType(typeKey) {
+  if (!typeKey || !RESULT_TYPE_KEYS.includes(typeKey)) return BASE_FULL_URL;
+  const map = {
+    mint: process.env.REACT_APP_BASE_MINT,
+    rose: process.env.REACT_APP_BASE_ROSE,
+    lavender: process.env.REACT_APP_BASE_LAVENDER,
+    ivory: process.env.REACT_APP_BASE_IVORY,
+    skyblue: process.env.REACT_APP_BASE_SKYBLUE
+  };
+  return map[typeKey] || process.env.REACT_APP_BASE_FULL_URL || BASE_FULL_URL;
+}
 
 function parseInitialResultRoute() {
   if (typeof window === "undefined") {
@@ -874,6 +905,136 @@ const styles = `
     letter-spacing: 0.04em;
   }
 
+  .line-gate-page {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 28px 18px 40px;
+    background: radial-gradient(circle at 20% 20%, #f9f2ff 0%, #eef7ff 45%, #eef5f0 100%);
+  }
+  .line-gate-card {
+    width: 100%;
+    max-width: 420px;
+    border-radius: 22px;
+    padding: 26px 20px 30px;
+    background: linear-gradient(150deg, rgba(255,255,255,0.92), rgba(255,255,255,0.78));
+    border: 1px solid rgba(255,255,255,0.85);
+    box-shadow: 0 16px 40px rgba(158, 142, 189, 0.2);
+    text-align: center;
+  }
+  .line-gate-title {
+    font-family: "Shippori Mincho", serif;
+    font-size: clamp(20px, 5vw, 24px);
+    margin: 0 0 12px;
+    color: #4a3f63;
+    line-height: 1.45;
+  }
+  .line-gate-lead {
+    margin: 0 0 20px;
+    color: #5c5470;
+    font-size: clamp(14px, 3.8vw, 16px);
+    line-height: 1.75;
+    text-align: left;
+  }
+  .line-gate-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    border: none;
+    border-radius: 999px;
+    padding: 16px 22px;
+    font-size: clamp(15px, 4vw, 17px);
+    font-weight: 800;
+    cursor: pointer;
+    font-family: inherit;
+    margin-top: 10px;
+    min-height: 54px;
+    transition: transform 0.15s ease;
+  }
+  .line-gate-btn:active { transform: scale(0.98); }
+  .line-gate-btn--green {
+    background: #06C755;
+    color: #fff;
+    box-shadow: 0 10px 28px rgba(6, 199, 85, 0.38);
+    text-decoration: none;
+  }
+  .line-gate-btn--purple {
+    background: linear-gradient(135deg, #7c3aed, #a855f7);
+    color: #fff;
+    box-shadow: 0 10px 28px rgba(124, 58, 237, 0.35);
+  }
+  .line-gate-note {
+    margin-top: 14px;
+    font-size: 12px;
+    color: #8b7fa3;
+    line-height: 1.55;
+  }
+  .line-cta-hero {
+    margin-top: 28px;
+    padding: 22px 16px 26px;
+    border-radius: 20px;
+    background: linear-gradient(160deg, rgba(6, 199, 85, 0.12), rgba(124, 58, 237, 0.08));
+    border: 2px solid rgba(6, 199, 85, 0.35);
+    text-align: center;
+    width: 100%;
+  }
+  .line-cta-hero-title {
+    margin: 0 0 6px;
+    font-size: clamp(17px, 4.5vw, 20px);
+    font-weight: 800;
+    color: #1a5c3a;
+    letter-spacing: 0.04em;
+  }
+  .line-cta-hero-sub {
+    margin: 0 0 16px;
+    font-size: 13px;
+    color: #4a5568;
+    line-height: 1.5;
+  }
+  .line-qr-big {
+    display: block;
+    width: min(280px, 78vw);
+    height: auto;
+    margin: 0 auto 18px;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    background: #fff;
+    padding: 8px;
+  }
+  .line-cta-huge-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: 320px;
+    margin: 0 auto;
+    padding: 18px 20px;
+    border-radius: 999px;
+    background: #06C755;
+    color: #fff !important;
+    font-size: clamp(16px, 4.2vw, 18px);
+    font-weight: 800;
+    text-decoration: none;
+    box-shadow: 0 12px 32px rgba(6, 199, 85, 0.45);
+    min-height: 58px;
+    line-height: 1.3;
+  }
+  .line-gate-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(124, 58, 237, 0.25);
+    border-top-color: #9333ea;
+    border-radius: 50%;
+    animation: gateSpin 0.85s linear infinite;
+    margin: 24px auto;
+  }
+  @keyframes gateSpin {
+    to { transform: rotate(360deg); }
+  }
+
   .result-card--reveal {
     animation: resultReveal 0.55s ease-out both;
   }
@@ -885,16 +1046,18 @@ const styles = `
 `;
 
 export default function App() {
-  const initialRoute = parseInitialResultRoute();
-  const [screen, setScreen] = useState(initialRoute.showResult ? "result" : "welcome");
+  const pendingDeepLinkRef = useRef(parseInitialResultRoute());
+  const deepLinkConsumedRef = useRef(false);
+  const liffRef = useRef(null);
+
+  const [lineAccess, setLineAccess] = useState(() => (DEV_LINE_GATE_BYPASS ? "ready" : "checking"));
+  const [screen, setScreen] = useState("welcome");
   const [welcomeMuted, setWelcomeMuted] = useState(true);
   const [welcomeExiting, setWelcomeExiting] = useState(false);
   const [currentQ, setCurrentQ] = useState(0);
   const [scores, setScores] = useState(initialScores);
-  const [resultKey, setResultKey] = useState(initialRoute.showResult ? initialRoute.resultType : "");
-  const [resultModeFull, setResultModeFull] = useState(
-    Boolean(initialRoute.showResult && initialRoute.modeFull)
-  );
+  const [resultKey, setResultKey] = useState("");
+  const [resultModeFull, setResultModeFull] = useState(false);
   const welcomeVideoRef = useRef(null);
   const finalVideoRef = useRef(null);
   const welcomeExitTimerRef = useRef(null);
@@ -906,7 +1069,60 @@ export default function App() {
   const currentQuestion = questions[currentQ];
   const result = resultKey ? results[resultKey] : null;
 
-  const immersive = screen === "welcome" || screen === "calculating";
+  const immersive =
+    lineAccess === "ready" && (screen === "welcome" || screen === "calculating");
+
+  useEffect(() => {
+    if (DEV_LINE_GATE_BYPASS) return;
+    if (!REACT_APP_LIFF_ID) {
+      setLineAccess("no_liff");
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const liff = (await import("@line/liff")).default;
+        await liff.init({ liffId: REACT_APP_LIFF_ID, withLoginOnExternalBrowser: true });
+        if (cancelled) return;
+        liffRef.current = liff;
+        if (!liff.isInClient()) {
+          setLineAccess("external");
+          return;
+        }
+        if (!liff.isLoggedIn()) {
+          setLineAccess("login");
+          return;
+        }
+        let friendFlag = false;
+        if (typeof liff.getFriendship === "function") {
+          const fs = await liff.getFriendship();
+          friendFlag = Boolean(fs.friendFlag);
+        }
+        if (!friendFlag) {
+          setLineAccess("friend");
+          return;
+        }
+        setLineAccess("ready");
+      } catch {
+        if (!cancelled) setLineAccess("external");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    if (lineAccess !== "ready") return;
+    if (deepLinkConsumedRef.current) return;
+    const p = pendingDeepLinkRef.current;
+    if (p.showResult && p.resultType) {
+      deepLinkConsumedRef.current = true;
+      setResultKey(p.resultType);
+      setResultModeFull(Boolean(p.modeFull));
+      setScreen("result");
+    }
+  }, [lineAccess]);
 
   useEffect(() => {
     if (screen !== "welcome") return undefined;
@@ -1000,7 +1216,7 @@ export default function App() {
       setCurrentQ(nextQ);
       return;
     }
-    const topResultKey = Object.entries(nextScores).sort((a, b) => b[1] - a[1])[0][0];
+    const topResultKey = computeResultFromScores(nextScores);
     setResultKey(topResultKey);
     setResultModeFull(false);
     setScreen("calculating");
@@ -1025,7 +1241,8 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (screen !== "result" || !resultKey || resultModeFull) return;
+    if (lineAccess !== "ready") return;
+    if (screen !== "result" || !resultKey) return;
     if (!REACT_APP_LIFF_ID) return;
     if (linePushSentRef.current) return;
 
@@ -1033,17 +1250,21 @@ export default function App() {
     (async () => {
       try {
         const liff = (await import("@line/liff")).default;
-        await liff.init({ liffId: REACT_APP_LIFF_ID });
+        await liff.init({ liffId: REACT_APP_LIFF_ID, withLoginOnExternalBrowser: true });
         if (cancelled) return;
-        if (!liff.isInClient()) return;
-        if (!liff.isLoggedIn()) return;
+        if (!liff.isInClient() || !liff.isLoggedIn()) return;
         const idToken = liff.getIDToken();
         if (!idToken) return;
+
+        const resData = results[resultKey];
+        const diagnosisText = resultModeFull
+          ? resData.fullBody
+          : `${resData.teaserFree}\n\n${resData.hookBeforeLock}`;
 
         const res = await fetch(`${window.location.origin}/api/line/push-result`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ idToken, resultType: resultKey })
+          body: JSON.stringify({ idToken, resultType: resultKey, diagnosisText })
         });
         if (res.ok) linePushSentRef.current = true;
       } catch (e) {
@@ -1056,9 +1277,24 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [screen, resultKey, resultModeFull]);
+  }, [lineAccess, screen, resultKey, resultModeFull]);
+
+  const lineQrSrc = getLineQrSrc();
+  const renderLineAcquisitionBlock = () => (
+    <div className="line-cta-hero">
+      <p className="line-cta-hero-title">{LINE_BRAND}</p>
+      <p className="line-cta-hero-sub">
+        キャンペーン・フル鑑定・お知らせは公式LINEからお届けします。QRコードを読み取るか、下のボタンで友だち追加してください。
+      </p>
+      <img className="line-qr-big" src={lineQrSrc} alt={`${LINE_BRAND}のQRコード`} width={300} height={300} />
+      <a className="line-cta-huge-btn" href={LINE_OFFICIAL_URL} target="_blank" rel="noopener noreferrer">
+        友だち追加する（公式LINE）
+      </a>
+    </div>
+  );
 
   const renderOshiResultCard = (res, isFull, typeKey) => {
+    const baseShopUrl = getBaseShopUrlForType(typeKey);
     const fullResultHref =
       typeof window !== "undefined" && typeKey && RESULT_TYPE_KEYS.includes(typeKey)
         ? `${window.location.origin}/result?type=${encodeURIComponent(typeKey)}&mode=full`
@@ -1095,13 +1331,14 @@ export default function App() {
           <div className="result-base-cta-wrap">
             <a
               className="result-base-cta"
-              href={BASE_FULL_URL}
+              href={baseShopUrl}
               target="_blank"
               rel="noopener noreferrer"
             >
-              BASE：フル鑑定
+              {`BASE：${res.name}のフル鑑定`}
             </a>
           </div>
+          {renderLineAcquisitionBlock()}
           <div className="result-retry-row">
             <button type="button" className="retry-btn" onClick={resetDiagnosis}>
               もう一度、推し色を見つける
@@ -1126,17 +1363,18 @@ export default function App() {
           </div>
           <div className="lock-overlay">
             <div className="lock-icon" aria-hidden>🔒</div>
-            <div className="lock-title">詳細な推し色診断はLINEでチェック</div>
+            <div className="lock-title">フル鑑定ページで続きを読む（あなたの推し色専用URL）</div>
             <a
               className="line-unlock-btn"
               href={fullResultHref}
               target="_blank"
               rel="noopener noreferrer"
             >
-              フル鑑定ページを開く（あなたの推し色）
+              フル鑑定ページを開く
             </a>
           </div>
         </div>
+        {renderLineAcquisitionBlock()}
         <div className="result-retry-row">
           <button type="button" className="retry-btn" onClick={resetDiagnosis}>
             もう一度、推し色を見つける
@@ -1146,9 +1384,81 @@ export default function App() {
     );
   };
 
+  const openLiffLineUrl = REACT_APP_LIFF_ID
+    ? `https://liff.line.me/${REACT_APP_LIFF_ID}`
+    : LINE_OFFICIAL_URL;
+
   return (
     <>
       <style>{styles}</style>
+      {lineAccess === "checking" && (
+        <div className="line-gate-page">
+          <div className="line-gate-card">
+            <div className="line-gate-spinner" aria-hidden />
+            <p className="line-gate-lead" style={{ textAlign: "center", marginBottom: 0 }}>
+              LINE連携を確認しています…
+            </p>
+          </div>
+        </div>
+      )}
+      {lineAccess === "no_liff" && (
+        <div className="line-gate-page">
+          <div className="line-gate-card">
+            <h1 className="line-gate-title">LIFF の設定が必要です</h1>
+            <p className="line-gate-lead">
+              本番では Vercel に <strong>REACT_APP_LIFF_ID</strong> を設定してください。開発中のみ{" "}
+              <strong>REACT_APP_DEV_LINE_BYPASS=1</strong> でゲートをスキップできます。
+            </p>
+            {renderLineAcquisitionBlock()}
+          </div>
+        </div>
+      )}
+      {lineAccess === "external" && (
+        <div className="line-gate-page">
+          <div className="line-gate-card">
+            <h1 className="line-gate-title">LINEアプリ内で開いてください</h1>
+            <p className="line-gate-lead">
+              友だち追加と診断結果の受け取りのため、まず公式LINEを登録し、LINEアプリ内のメニューからこの診断を開いてください。下のボタンからLINEを起動できます。
+            </p>
+            <a className="line-gate-btn line-gate-btn--green" href={openLiffLineUrl} style={{ textDecoration: "none" }}>
+              LINEで診断ページを開く
+            </a>
+            {renderLineAcquisitionBlock()}
+            <p className="line-gate-note">通常のブラウザでは結果を表示できません（集客・正確な配信のため）。</p>
+          </div>
+        </div>
+      )}
+      {lineAccess === "login" && (
+        <div className="line-gate-page">
+          <div className="line-gate-card">
+            <h1 className="line-gate-title">LINEログインが必要です</h1>
+            <p className="line-gate-lead">診断を始める前に、LINEアカウントでログインしてください。</p>
+            <button
+              type="button"
+              className="line-gate-btn line-gate-btn--purple"
+              onClick={() => liffRef.current?.login({ redirectUri: window.location.href })}
+            >
+              LINEでログイン
+            </button>
+            {renderLineAcquisitionBlock()}
+          </div>
+        </div>
+      )}
+      {lineAccess === "friend" && (
+        <div className="line-gate-page">
+          <div className="line-gate-card">
+            <h1 className="line-gate-title">公式LINEの友だち追加が必要です</h1>
+            <p className="line-gate-lead">
+              診断結果を受け取るには、薫凛香房の公式アカウントを友だち追加してください。追加後、下のボタンで再読み込みします。
+            </p>
+            {renderLineAcquisitionBlock()}
+            <button type="button" className="line-gate-btn line-gate-btn--purple" onClick={() => window.location.reload()}>
+              友だち追加したので再読み込み
+            </button>
+          </div>
+        </div>
+      )}
+      {lineAccess === "ready" && (
       <div className={`page${immersive ? " page--immersive" : ""}`}>
         {!immersive && (
           <>
@@ -1316,6 +1626,7 @@ export default function App() {
           </div>
         )}
       </div>
+      )}
     </>
   );
 }

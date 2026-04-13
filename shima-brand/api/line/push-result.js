@@ -8,6 +8,49 @@ const TYPE_LABEL = {
   skyblue: "🩵スカイブルー"
 };
 
+/** サーバー側の鑑定コピー（クライアントと揃えること） */
+const PUSH_BODY = {
+  mint: `【ミントグリーン】
+あなたは、人を支えることが自然にできる人です。周りを優先しすぎていないか、一度立ち止まってみてください。
+・自分の時間を少しだけ優先する
+・無理に合わせるのをやめる
+本来のあなたは、もっと自然体でいられる人です。`,
+  rose: `【ローズピンク】
+あなたは、感情豊かに愛せる人です。気持ちが強くなりすぎていないか、自分の内側も見てあげてください。
+・相手ではなく、自分の気持ちを見てみる
+・少しだけ距離を取る
+本来のあなたは、愛を受け取りながら与えられる人です。`,
+  lavender: `【ラベンダー】
+あなたは、とても感性が豊かな人です。内側に寄りすぎていないか、少し外に出してみてください。
+・感じたことを少し言葉にする
+・小さく外に出してみる
+本来のあなたは、感性を現実に活かせる人です。`,
+  ivory: `【アイボリー】
+あなたは、安定した判断ができる人です。感情を抑えすぎていないか、優しく向き合ってみてください。
+・自分の気持ちを少し言葉にする
+・楽しいと感じることを選ぶ
+本来のあなたは、安定と感情の両方を持てる人です。`,
+  skyblue: `【スカイブルー】
+あなたは、自由に動ける人です。流れに任せすぎていないか、一つ決めてみてください。
+・1つだけ続けることを決める
+・少しだけ深く向き合う
+本来のあなたは、自由と継続を両方持てる人です。`
+};
+
+const MAX_TEXT = 4800;
+
+function splitLineMessages(text) {
+  const t = text.trim();
+  if (t.length <= MAX_TEXT) return [{ type: "text", text: t }];
+  const parts = [];
+  let rest = t;
+  while (rest.length > 0) {
+    parts.push(rest.slice(0, MAX_TEXT));
+    rest = rest.slice(MAX_TEXT);
+  }
+  return parts.map((body) => ({ type: "text", text: body }));
+}
+
 async function verifyIdToken(idToken, channelId) {
   const body = new URLSearchParams();
   body.set("id_token", idToken);
@@ -50,7 +93,7 @@ export default async function handler(req, res) {
     }
   }
 
-  const { idToken, resultType } = payload || {};
+  const { idToken, resultType, diagnosisText } = payload || {};
   if (!idToken || typeof idToken !== "string" || !VALID_TYPES.includes(resultType)) {
     res.status(400).json({ error: "Invalid idToken or resultType" });
     return;
@@ -66,12 +109,15 @@ export default async function handler(req, res) {
   const fullUrl = `${siteBase}/result?type=${encodeURIComponent(resultType)}&mode=full`;
   const label = TYPE_LABEL[resultType] || resultType;
 
-  const messages = [
-    {
-      type: "text",
-      text: `あなたの推し色は「${label}」タイプです。\n\nフル鑑定ページ（専用URL）\n${fullUrl}`
-    }
-  ];
+  const serverBody = PUSH_BODY[resultType] || "";
+  const clientExtra =
+    typeof diagnosisText === "string" && diagnosisText.trim().length > 0
+      ? `\n\n── 鑑定メモ ──\n${diagnosisText.trim().slice(0, 3500)}`
+      : "";
+
+  const block1 = `【推し色診断・結果】\nあなたの推し色は「${label}」タイプです。\n\n${serverBody}${clientExtra}\n\n▼フル鑑定ページ\n${fullUrl}`;
+
+  const messages = splitLineMessages(block1);
 
   const pushRes = await fetch("https://api.line.me/v2/bot/message/push", {
     method: "POST",
