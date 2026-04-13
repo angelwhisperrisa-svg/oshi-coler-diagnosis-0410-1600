@@ -9,6 +9,7 @@ const LINE_OFFICIAL_URL = "https://line.me/R/ti/p/@877xrsvw";
 const BASE_FULL_URL = process.env.REACT_APP_BASE_FULL_URL || "https://thebase.in/";
 
 const RESULT_TYPE_KEYS = ["mint", "rose", "lavender", "ivory", "skyblue"];
+const REACT_APP_LIFF_ID = process.env.REACT_APP_LIFF_ID || "";
 
 function parseInitialResultRoute() {
   if (typeof window === "undefined") {
@@ -899,6 +900,7 @@ export default function App() {
   const welcomeExitTimerRef = useRef(null);
   const welcomeSilentSkipTimerRef = useRef(null);
   const welcomeEngagedRef = useRef(false);
+  const linePushSentRef = useRef(false);
 
   const progress = Math.round((currentQ / questions.length) * 100);
   const currentQuestion = questions[currentQ];
@@ -1005,6 +1007,7 @@ export default function App() {
   };
 
   const resetDiagnosis = () => {
+    linePushSentRef.current = false;
     if (typeof window !== "undefined") {
       const path = (window.location.pathname || "").replace(/\/$/, "") || "/";
       if (path === "/result" || path.endsWith("/result")) {
@@ -1021,7 +1024,45 @@ export default function App() {
     setResultModeFull(false);
   };
 
-  const renderOshiResultCard = (res, isFull) => {
+  useEffect(() => {
+    if (screen !== "result" || !resultKey || resultModeFull) return;
+    if (!REACT_APP_LIFF_ID) return;
+    if (linePushSentRef.current) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const liff = (await import("@line/liff")).default;
+        await liff.init({ liffId: REACT_APP_LIFF_ID });
+        if (cancelled) return;
+        if (!liff.isInClient()) return;
+        if (!liff.isLoggedIn()) return;
+        const idToken = liff.getIDToken();
+        if (!idToken) return;
+
+        const res = await fetch(`${window.location.origin}/api/line/push-result`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ idToken, resultType: resultKey })
+        });
+        if (res.ok) linePushSentRef.current = true;
+      } catch (e) {
+        if (process.env.NODE_ENV === "development") {
+          console.warn("[line push]", e);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [screen, resultKey, resultModeFull]);
+
+  const renderOshiResultCard = (res, isFull, typeKey) => {
+    const fullResultHref =
+      typeof window !== "undefined" && typeKey && RESULT_TYPE_KEYS.includes(typeKey)
+        ? `${window.location.origin}/result?type=${encodeURIComponent(typeKey)}&mode=full`
+        : LINE_OFFICIAL_URL;
     const header = (
       <>
         <div className="result-label">YOUR OSHI COLOR</div>
@@ -1088,11 +1129,11 @@ export default function App() {
             <div className="lock-title">詳細な推し色診断はLINEでチェック</div>
             <a
               className="line-unlock-btn"
-              href={LINE_OFFICIAL_URL}
+              href={fullResultHref}
               target="_blank"
               rel="noopener noreferrer"
             >
-              LINEで詳細をアンロック
+              フル鑑定ページを開く（あなたの推し色）
             </a>
           </div>
         </div>
@@ -1232,7 +1273,7 @@ export default function App() {
             </>
           )}
 
-          {screen === "result" && result && renderOshiResultCard(result, resultModeFull)}
+          {screen === "result" && result && renderOshiResultCard(result, resultModeFull, resultKey)}
             </main>
           </>
         )}
