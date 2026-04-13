@@ -11,8 +11,6 @@ const BASE_FULL_URL = process.env.REACT_APP_BASE_FULL_URL || "https://thebase.in
 const RESULT_TYPE_KEYS = ["mint", "rose", "lavender", "ivory", "skyblue"];
 const REACT_APP_LIFF_ID = process.env.REACT_APP_LIFF_ID || "";
 const LINE_BRAND = "薫凛香房 公式LINE";
-const DEV_LINE_GATE_BYPASS =
-  process.env.NODE_ENV === "development" && process.env.REACT_APP_DEV_LINE_BYPASS === "1";
 
 function getLineQrSrc() {
   const custom = process.env.REACT_APP_LINE_QR_IMAGE_URL;
@@ -1063,9 +1061,9 @@ const styles = `
 export default function App() {
   const pendingDeepLinkRef = useRef(parseInitialResultRoute());
   const deepLinkConsumedRef = useRef(false);
-  const liffRef = useRef(null);
+  /** 診断（クイズ）完了後だけ URL を /result?type=&mode=free に同期する */
+  const shouldSyncQuizResultUrlRef = useRef(false);
 
-  const [lineAccess, setLineAccess] = useState(() => (DEV_LINE_GATE_BYPASS ? "ready" : "checking"));
   const [screen, setScreen] = useState("welcome");
   const [welcomeMuted, setWelcomeMuted] = useState(true);
   const [welcomeExiting, setWelcomeExiting] = useState(false);
@@ -1084,58 +1082,9 @@ export default function App() {
   const currentQuestion = questions[currentQ];
   const result = resultKey ? results[resultKey] : null;
 
-  const immersive =
-    lineAccess === "ready" && (screen === "welcome" || screen === "calculating");
-
-  useEffect(() => {
-    if (DEV_LINE_GATE_BYPASS) return;
-    if (!REACT_APP_LIFF_ID) {
-      setLineAccess("no_liff");
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const liff = (await import("@line/liff")).default;
-        await liff.init({ liffId: REACT_APP_LIFF_ID, withLoginOnExternalBrowser: true });
-        if (cancelled) return;
-        liffRef.current = liff;
-        const inLineUi = liff.isInClient() || isLikelyLineInAppBrowser();
-        if (!inLineUi) {
-          setLineAccess("external");
-          return;
-        }
-        if (!liff.isLoggedIn()) {
-          setLineAccess("login");
-          return;
-        }
-        let friendFlag = false;
-        if (typeof liff.getFriendship === "function") {
-          try {
-            const fs = await liff.getFriendship();
-            friendFlag = Boolean(fs.friendFlag);
-          } catch {
-            friendFlag = true;
-          }
-        } else {
-          friendFlag = true;
-        }
-        if (!friendFlag) {
-          setLineAccess("friend");
-          return;
-        }
-        setLineAccess("ready");
-      } catch {
-        if (!cancelled) setLineAccess("external");
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const immersive = screen === "welcome" || screen === "calculating";
 
   useLayoutEffect(() => {
-    if (lineAccess !== "ready") return;
     if (deepLinkConsumedRef.current) return;
     const p = pendingDeepLinkRef.current;
     if (p.showResult && p.resultType) {
@@ -1144,7 +1093,18 @@ export default function App() {
       setResultModeFull(Boolean(p.modeFull));
       setScreen("result");
     }
-  }, [lineAccess]);
+  }, []);
+
+  useEffect(() => {
+    if (screen !== "result" || !resultKey) return;
+    if (!shouldSyncQuizResultUrlRef.current) return;
+    shouldSyncQuizResultUrlRef.current = false;
+    if (typeof window === "undefined") return;
+    const base = (publicUrl || "").replace(/\/$/, "");
+    const qs = `?type=${encodeURIComponent(resultKey)}&mode=free`;
+    const path = base ? `${base}/result${qs}` : `/result${qs}`;
+    window.history.replaceState({}, "", path);
+  }, [screen, resultKey]);
 
   useEffect(() => {
     if (screen !== "welcome") return undefined;
@@ -1241,11 +1201,13 @@ export default function App() {
     const topResultKey = computeResultFromScores(nextScores);
     setResultKey(topResultKey);
     setResultModeFull(false);
+    shouldSyncQuizResultUrlRef.current = true;
     setScreen("calculating");
   };
 
   const resetDiagnosis = () => {
     linePushSentRef.current = false;
+    shouldSyncQuizResultUrlRef.current = false;
     if (typeof window !== "undefined") {
       const path = (window.location.pathname || "").replace(/\/$/, "") || "/";
       if (path === "/result" || path.endsWith("/result")) {
@@ -1263,7 +1225,6 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (lineAccess !== "ready") return;
     if (screen !== "result" || !resultKey) return;
     if (!REACT_APP_LIFF_ID) return;
     if (linePushSentRef.current) return;
@@ -1300,14 +1261,14 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [lineAccess, screen, resultKey, resultModeFull]);
+  }, [screen, resultKey, resultModeFull]);
 
   const lineQrSrc = getLineQrSrc();
   const renderLineAcquisitionBlock = () => (
     <div className="line-cta-hero">
       <p className="line-cta-hero-title">{LINE_BRAND}</p>
       <p className="line-cta-hero-sub">
-        キャンペーン・フル鑑定・お知らせは公式LINEからお届けします。QRコードを読み取るか、下のボタンで友だち追加してください。
+        診断後の続き・キャンペーン・お知らせは公式LINEからお届けします。QRコードを読み取るか、下のボタンで友だち追加してください。
       </p>
       <img className="line-qr-big" src={lineQrSrc} alt={`${LINE_BRAND}のQRコード`} width={300} height={300} />
       <a className="line-cta-huge-btn" href={LINE_OFFICIAL_URL} target="_blank" rel="noopener noreferrer">
@@ -1386,7 +1347,7 @@ export default function App() {
           </div>
           <div className="lock-overlay">
             <div className="lock-icon" aria-hidden>🔒</div>
-            <div className="lock-title">フル鑑定ページで続きを読む（あなたの推し色専用URL）</div>
+            <div className="lock-title">LINE登録後はリッチメニューから色別の無料鑑定へ。続きはフル鑑定ページへ</div>
             <a
               className="line-unlock-btn"
               href={fullResultHref}
@@ -1407,81 +1368,9 @@ export default function App() {
     );
   };
 
-  const openLiffLineUrl = REACT_APP_LIFF_ID
-    ? `https://liff.line.me/${REACT_APP_LIFF_ID}`
-    : LINE_OFFICIAL_URL;
-
   return (
     <>
       <style>{styles}</style>
-      {lineAccess === "checking" && (
-        <div className="line-gate-page">
-          <div className="line-gate-card">
-            <div className="line-gate-spinner" aria-hidden />
-            <p className="line-gate-lead" style={{ textAlign: "center", marginBottom: 0 }}>
-              LINE連携を確認しています…
-            </p>
-          </div>
-        </div>
-      )}
-      {lineAccess === "no_liff" && (
-        <div className="line-gate-page">
-          <div className="line-gate-card">
-            <h1 className="line-gate-title">LIFF の設定が必要です</h1>
-            <p className="line-gate-lead">
-              本番では Vercel に <strong>REACT_APP_LIFF_ID</strong> を設定してください。開発中のみ{" "}
-              <strong>REACT_APP_DEV_LINE_BYPASS=1</strong> でゲートをスキップできます。
-            </p>
-            {renderLineAcquisitionBlock()}
-          </div>
-        </div>
-      )}
-      {lineAccess === "external" && (
-        <div className="line-gate-page">
-          <div className="line-gate-card">
-            <h1 className="line-gate-title">LINEアプリ内で開いてください</h1>
-            <p className="line-gate-lead">
-              友だち追加と診断結果の受け取りのため、まず公式LINEを登録し、LINEアプリ内のメニューからこの診断を開いてください。下のボタンからLINEを起動できます。
-            </p>
-            <a className="line-gate-btn line-gate-btn--green" href={openLiffLineUrl} style={{ textDecoration: "none" }}>
-              LINEで診断ページを開く
-            </a>
-            {renderLineAcquisitionBlock()}
-            <p className="line-gate-note">通常のブラウザでは結果を表示できません（集客・正確な配信のため）。</p>
-          </div>
-        </div>
-      )}
-      {lineAccess === "login" && (
-        <div className="line-gate-page">
-          <div className="line-gate-card">
-            <h1 className="line-gate-title">LINEログインが必要です</h1>
-            <p className="line-gate-lead">診断を始める前に、LINEアカウントでログインしてください。</p>
-            <button
-              type="button"
-              className="line-gate-btn line-gate-btn--purple"
-              onClick={() => liffRef.current?.login({ redirectUri: window.location.href })}
-            >
-              LINEでログイン
-            </button>
-            {renderLineAcquisitionBlock()}
-          </div>
-        </div>
-      )}
-      {lineAccess === "friend" && (
-        <div className="line-gate-page">
-          <div className="line-gate-card">
-            <h1 className="line-gate-title">公式LINEの友だち追加が必要です</h1>
-            <p className="line-gate-lead">
-              診断結果を受け取るには、薫凛香房の公式アカウントを友だち追加してください。追加後、下のボタンで再読み込みします。
-            </p>
-            {renderLineAcquisitionBlock()}
-            <button type="button" className="line-gate-btn line-gate-btn--purple" onClick={() => window.location.reload()}>
-              友だち追加したので再読み込み
-            </button>
-          </div>
-        </div>
-      )}
-      {lineAccess === "ready" && (
       <div className={`page${immersive ? " page--immersive" : ""}`}>
         {!immersive && (
           <>
@@ -1649,7 +1538,6 @@ export default function App() {
           </div>
         )}
       </div>
-      )}
     </>
   );
 }
