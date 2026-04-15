@@ -1186,11 +1186,7 @@ export default function App() {
     if (p.autoMissingStorage) {
       deepLinkConsumedRef.current = true;
       shouldSendLinePushRef.current = false;
-      if (typeof window !== "undefined") {
-        const base = (publicUrl || "").replace(/\/$/, "");
-        window.history.replaceState({}, "", base ? `${base}/` : "/");
-      }
-      setScreen("welcome");
+      setScreen("line_pending");
       return;
     }
     if (p.showResult && p.resultType) {
@@ -1569,6 +1565,16 @@ export default function App() {
               あなたにふさわしい推し色を教えてくれる。
             </p>
           </header>
+
+          {screen === "line_pending" && (
+            <section className="card start-screen">
+              <p className="start-text">
+                LINEの推し色結果を表示するための情報が見つかりませんでした。診断完了画面の
+                「LINEでこの推し色結果を開く」ボタンから開くと、同じ色で表示できます。
+              </p>
+              <button className="start-btn" onClick={() => setScreen("start")}>診断トップへ戻る</button>
+            </section>
+          )}
 
           {screen === "start" && (
             <section className="card start-screen">
