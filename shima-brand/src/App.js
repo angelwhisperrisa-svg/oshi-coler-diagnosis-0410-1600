@@ -15,17 +15,6 @@ const LINE_BRAND = "薫凛香房 公式LINE";
 /** 診断タイプ保持（リッチメニュー等の /result?auto=true から分岐するため） */
 const OSHI_RESULT_STORAGE_KEY = "shima_oshi_result_v1";
 
-function readStoredOshiType() {
-  try {
-    if (typeof window === "undefined") return null;
-    const raw = window.localStorage.getItem(OSHI_RESULT_STORAGE_KEY);
-    if (raw && RESULT_TYPE_KEYS.includes(raw)) return raw;
-  } catch (_) {
-    /* ignore */
-  }
-  return null;
-}
-
 function normalizeTypeKey(v) {
   if (!v || typeof v !== "string") return null;
   const t = v.trim().toLowerCase();
@@ -125,19 +114,17 @@ function parseInitialResultRoute() {
 
   if (isAuto) {
     const explicitType = normalizeTypeKey(params.get("type"));
-    const storedType = normalizeTypeKey(readStoredOshiType());
     const modeParam = (params.get("mode") || "full").toLowerCase();
     const modeFull = modeParam !== "free";
-    const resolvedType = explicitType || storedType;
-    if (resolvedType) {
+    if (explicitType) {
       return {
         showResult: true,
-        resultType: resolvedType,
+        resultType: explicitType,
         modeFull,
         replaceUrlWithCanonical: true
       };
     }
-    // type も保存結果も無い場合のみ空振り
+    // type 未指定の auto は誤色防止のため結果を表示しない
     return { ...empty, autoMissingStorage: true };
   }
 
