@@ -40,6 +40,17 @@ function clearStoredOshiType() {
   }
 }
 
+function readStoredOshiType() {
+  try {
+    if (typeof window === "undefined") return null;
+    const raw = window.localStorage.getItem(OSHI_RESULT_STORAGE_KEY);
+    if (raw && RESULT_TYPE_KEYS.includes(raw)) return raw;
+  } catch (_) {
+    /* ignore */
+  }
+  return null;
+}
+
 function getLineQrSrc() {
   const custom = process.env.REACT_APP_LINE_QR_IMAGE_URL;
   if (custom) return custom;
@@ -106,6 +117,26 @@ function parseInitialResultRoute() {
   if (!isResultPath) return empty;
 
   const params = new URLSearchParams(window.location.search);
+  const autoRaw = params.get("auto");
+  const isAuto = autoRaw === "true" || autoRaw === "1";
+
+  if (isAuto) {
+    const explicitType = normalizeTypeKey(params.get("type"));
+    const storedType = normalizeTypeKey(readStoredOshiType());
+    const modeParam = (params.get("mode") || "full").toLowerCase();
+    const modeFull = modeParam !== "free";
+    const resolvedType = explicitType || storedType;
+    if (resolvedType) {
+      return {
+        showResult: true,
+        resultType: resolvedType,
+        modeFull,
+        replaceUrlWithCanonical: true
+      };
+    }
+    return { ...empty, autoMissingStorage: true };
+  }
+
   const type = normalizeTypeKey(params.get("type"));
   const mode = params.get("mode");
   if (!type) return empty;
@@ -1154,6 +1185,12 @@ export default function App() {
   useLayoutEffect(() => {
     if (deepLinkConsumedRef.current) return;
     const p = pendingDeepLinkRef.current;
+    if (p.autoMissingStorage) {
+      deepLinkConsumedRef.current = true;
+      shouldSendLinePushRef.current = false;
+      setScreen("start");
+      return;
+    }
     if (p.showResult && p.resultType) {
       deepLinkConsumedRef.current = true;
       shouldSendLinePushRef.current = false;
