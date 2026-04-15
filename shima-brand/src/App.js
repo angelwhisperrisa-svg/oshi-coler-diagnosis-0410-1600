@@ -25,7 +25,7 @@ function writeStoredOshiType(typeKey) {
   try {
     if (typeof window === "undefined") return;
     if (!typeKey || !RESULT_TYPE_KEYS.includes(typeKey)) return;
-    window.localStorage.setItem(OSHI_RESULT_STORAGE_KEY, typeKey);
+    window.sessionStorage.setItem(OSHI_RESULT_STORAGE_KEY, typeKey);
   } catch (_) {
     /* ignore */
   }
@@ -34,7 +34,7 @@ function writeStoredOshiType(typeKey) {
 function clearStoredOshiType() {
   try {
     if (typeof window === "undefined") return;
-    window.localStorage.removeItem(OSHI_RESULT_STORAGE_KEY);
+    window.sessionStorage.removeItem(OSHI_RESULT_STORAGE_KEY);
   } catch (_) {
     /* ignore */
   }
@@ -43,7 +43,7 @@ function clearStoredOshiType() {
 function readStoredOshiType() {
   try {
     if (typeof window === "undefined") return null;
-    const raw = window.localStorage.getItem(OSHI_RESULT_STORAGE_KEY);
+    const raw = window.sessionStorage.getItem(OSHI_RESULT_STORAGE_KEY);
     if (raw && RESULT_TYPE_KEYS.includes(raw)) return raw;
   } catch (_) {
     /* ignore */
@@ -121,19 +121,22 @@ function parseInitialResultRoute() {
   const isAuto = autoRaw === "true" || autoRaw === "1";
 
   if (isAuto) {
-    const explicitType = normalizeTypeKey(params.get("type"));
-    const storedType = normalizeTypeKey(readStoredOshiType());
     const modeParam = (params.get("mode") || "full").toLowerCase();
     const modeFull = modeParam !== "free";
-    const resolvedType = explicitType || storedType;
-    if (resolvedType) {
-      return {
-        showResult: true,
-        resultType: resolvedType,
-        modeFull,
-        replaceUrlWithCanonical: true
-      };
+
+    // 優先順位①：URL の type パラメータ（最優先）
+    const urlType = normalizeTypeKey(params.get("type"));
+    if (urlType) {
+      return { showResult: true, resultType: urlType, modeFull, replaceUrlWithCanonical: true };
     }
+
+    // 優先順位②：sessionStorage（同一セッション内の診断結果）
+    const sessionType = normalizeTypeKey(readStoredOshiType());
+    if (sessionType) {
+      return { showResult: true, resultType: sessionType, modeFull, replaceUrlWithCanonical: true };
+    }
+
+    // 優先順位③：何もなければ表示しない（デフォルト値禁止）
     return { ...empty, autoMissingStorage: true };
   }
 
