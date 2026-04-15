@@ -74,20 +74,23 @@ async function verifyIdToken(idToken, channelId) {
 
 async function linkUserRichMenu({ accessToken, lineUserId, resultType }) {
   const richMenuId = RICH_MENU_ID_BY_TYPE[resultType];
-  if (!richMenuId) return { skipped: true };
+  if (!richMenuId) return { ok: false, skipped: true, reason: "missing_richmenu_id" };
 
   const endpoint = `https://api.line.me/v2/bot/user/${encodeURIComponent(lineUserId)}/richmenu/${encodeURIComponent(richMenuId)}`;
-  const r = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`
-    }
-  });
-  if (!r.ok) {
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const r = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      }
+    });
+    if (r.ok) return { ok: true, attempt };
     const detail = await r.text();
-    return { ok: false, status: r.status, detail: detail.slice(0, 500) };
+    if (attempt === 3) {
+      return { ok: false, status: r.status, detail: detail.slice(0, 500), attempt };
+    }
   }
-  return { ok: true };
+  return { ok: false, reason: "unknown" };
 }
 
 export default async function handler(req, res) {
@@ -165,21 +168,13 @@ export default async function handler(req, res) {
   }
 
   const richMenuLinkResult = await linkUserRichMenu({ accessToken, lineUserId, resultType });
-  if (richMenuLinkResult.ok === false) {
-    console.error("LINE rich menu link failed", richMenuLinkResult.status, richMenuLinkResult.detail);
-    res.status(502).json({
-      error: "LINE rich menu link failed",
+  if (!richMenuLinkResult.ok) {
+    console.warn("LINE rich menu link skipped/failed", {
+      resultType,
       status: richMenuLinkResult.status,
-      detail: richMenuLinkResult.detail
+      detail: richMenuLinkResult.detail,
+      reason: richMenuLinkResult.reason
     });
-    return;
-  }
-  if (richMenuLinkResult.skipped) {
-    res.status(500).json({
-      error: "LINE rich menu id is not configured for this result type",
-      resultType
-    });
-    return;
   }
 
   res.status(200).json({ ok: true, richMenuLinkResult });
