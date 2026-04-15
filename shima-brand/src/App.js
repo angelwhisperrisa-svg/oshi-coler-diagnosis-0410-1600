@@ -26,6 +26,12 @@ function readStoredOshiType() {
   return null;
 }
 
+function normalizeTypeKey(v) {
+  if (!v || typeof v !== "string") return null;
+  const t = v.trim().toLowerCase();
+  return RESULT_TYPE_KEYS.includes(t) ? t : null;
+}
+
 function writeStoredOshiType(typeKey) {
   try {
     if (typeof window === "undefined") return;
@@ -56,9 +62,10 @@ function getLineQrSrc() {
  * localStorage 依存ではなく type クエリ優先で着地を固定する。
  */
 function buildLineResultUrl(typeKey, mode = "full") {
-  if (!typeKey || !RESULT_TYPE_KEYS.includes(typeKey)) return "";
+  const normalizedType = normalizeTypeKey(typeKey);
+  if (!normalizedType) return "";
   const prefix = (publicUrl || "").replace(/\/$/, "");
-  const qs = `?auto=true&type=${encodeURIComponent(typeKey)}&mode=${mode === "free" ? "free" : "full"}`;
+  const qs = `?type=${encodeURIComponent(normalizedType)}&mode=${mode === "free" ? "free" : "full"}`;
   const appPath = `${prefix}/result${qs}`;
   if (typeof window !== "undefined") {
     return `${window.location.origin}${appPath}`;
@@ -117,9 +124,8 @@ function parseInitialResultRoute() {
   const isAuto = autoRaw === "true" || autoRaw === "1";
 
   if (isAuto) {
-    const typeParam = params.get("type");
-    const explicitType = typeParam && RESULT_TYPE_KEYS.includes(typeParam) ? typeParam : null;
-    const storedType = readStoredOshiType();
+    const explicitType = normalizeTypeKey(params.get("type"));
+    const storedType = normalizeTypeKey(readStoredOshiType());
     const modeParam = (params.get("mode") || "full").toLowerCase();
     const modeFull = modeParam !== "free";
     const resolvedType = explicitType || storedType;
@@ -135,9 +141,9 @@ function parseInitialResultRoute() {
     return { ...empty, autoMissingStorage: true };
   }
 
-  const type = params.get("type");
+  const type = normalizeTypeKey(params.get("type"));
   const mode = params.get("mode");
-  if (!type || !RESULT_TYPE_KEYS.includes(type)) return empty;
+  if (!type) return empty;
   return {
     showResult: true,
     resultType: type,
