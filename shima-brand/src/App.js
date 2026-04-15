@@ -5,12 +5,10 @@ const VIDEO = {
   welcome: `${publicUrl}/videos/A_Oshiiro_welcome_1080p.mp4`,
   final: `${publicUrl}/videos/C_Oshiiro_Thank_you_and_invite_1080p.mp4`
 };
-const LINE_OFFICIAL_URL = "https://line.me/R/ti/p/@877xrsvw";
 const BASE_FULL_URL = process.env.REACT_APP_BASE_FULL_URL || "https://thebase.in/";
 
 const RESULT_TYPE_KEYS = ["mint", "rose", "lavender", "ivory", "skyblue"];
 const REACT_APP_LIFF_ID = process.env.REACT_APP_LIFF_ID || "";
-const LINE_BRAND = "薫凛香房 公式LINE";
 
 /** 診断タイプ保持（リッチメニュー等の /result?auto=true から分岐するため） */
 const OSHI_RESULT_STORAGE_KEY = "shima_oshi_result_v1";
@@ -43,12 +41,6 @@ function clearStoredOshiType() {
   } catch (_) {
     /* ignore */
   }
-}
-
-function getLineQrSrc() {
-  const custom = process.env.REACT_APP_LINE_QR_IMAGE_URL;
-  if (custom) return custom;
-  return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=8&data=${encodeURIComponent(LINE_OFFICIAL_URL)}`;
 }
 
 /** 回答スコアのみで判定。同点時は固定の優先順（URLには依存しない） */
@@ -102,13 +94,16 @@ function parseInitialResultRoute() {
   const isAuto = autoRaw === "true" || autoRaw === "1";
 
   if (isAuto) {
+    const typeParam = params.get("type");
+    const explicitType = typeParam && RESULT_TYPE_KEYS.includes(typeParam) ? typeParam : null;
     const stored = readStoredOshiType();
     const modeParam = (params.get("mode") || "full").toLowerCase();
     const modeFull = modeParam !== "free";
-    if (stored) {
+    const resolvedType = explicitType || stored;
+    if (resolvedType) {
       return {
         showResult: true,
-        resultType: stored,
+        resultType: resolvedType,
         modeFull,
         replaceUrlWithCanonical: true
       };
@@ -1365,20 +1360,6 @@ export default function App() {
     };
   }, [screen, resultKey, resultModeFull]);
 
-  const lineQrSrc = getLineQrSrc();
-  const renderLineAcquisitionBlock = () => (
-    <div className="line-cta-hero">
-      <p className="line-cta-hero-title">{LINE_BRAND}</p>
-      <p className="line-cta-hero-sub">
-        フル鑑定の続きはLINEで受け取れます。まずは公式LINEを登録してください。QRコードを読み取るか、下のボタンで友だち追加できます。
-      </p>
-      <img className="line-qr-big" src={lineQrSrc} alt={`${LINE_BRAND}のQRコード`} width={300} height={300} />
-      <a className="line-cta-huge-btn" href={LINE_OFFICIAL_URL} target="_blank" rel="noopener noreferrer">
-        友だち追加する（公式LINE）
-      </a>
-    </div>
-  );
-
   const renderOshiResultCard = (res, isFull, typeKey) => {
     const baseShopUrl = getBaseShopUrlForType(typeKey);
     const renderBaseCta = () => (
@@ -1426,7 +1407,6 @@ export default function App() {
               <p className="result-free-chunk">{res.fullBody}</p>
             </div>
           </div>
-          {renderLineAcquisitionBlock()}
           {renderBaseCta()}
           <div className="result-retry-row">
             <button type="button" className="retry-btn" onClick={resetDiagnosis}>
@@ -1455,7 +1435,6 @@ export default function App() {
             <div className="lock-title">LINE登録後はリッチメニューから色別の無料鑑定を受け取れます。</div>
           </div>
         </div>
-        {renderLineAcquisitionBlock()}
         {renderBaseCta()}
         <div className="result-retry-row">
           <button type="button" className="retry-btn" onClick={resetDiagnosis}>
