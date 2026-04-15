@@ -1371,12 +1371,7 @@ export default function App() {
         if (cancelled) return;
         const inLineUi = liff.isInClient() || isLikelyLineInAppBrowser();
         if (!inLineUi) return;
-        if (!liff.isLoggedIn()) {
-          // LINE内ブラウザだが LIFF 未認証（通常URL経由）→ resultKey を保存してログインへ
-          try { sessionStorage.setItem("liff_pending_push", resultKey); } catch (_) {}
-          try { liff.login({ redirectUri: window.location.href }); } catch (_) {}
-          return;
-        }
+        if (!liff.isLoggedIn()) return;
         const idToken = liff.getIDToken();
         if (!idToken) return;
 
@@ -1403,30 +1398,9 @@ export default function App() {
     };
   }, [screen, resultKey, resultModeFull]);
 
-  // LIFFログイン後リダイレクト戻りのプッシュ送信
+  // liff_pending_push の古いデータをクリア（旧 liff.login() リダイレクト方式の残骸）
   useEffect(() => {
-    if (!REACT_APP_LIFF_ID) return;
-    let pendingType;
-    try { pendingType = sessionStorage.getItem("liff_pending_push"); } catch (_) { return; }
-    if (!pendingType || !RESULT_TYPE_KEYS.includes(pendingType)) return;
-
-    (async () => {
-      try {
-        const liff = (await import("@line/liff")).default;
-        await liff.init({ liffId: REACT_APP_LIFF_ID, withLoginOnExternalBrowser: false });
-        if (!liff.isLoggedIn()) return;
-        const idToken = liff.getIDToken();
-        if (!idToken) return;
-        try { sessionStorage.removeItem("liff_pending_push"); } catch (_) {}
-        const resData = results[pendingType];
-        const diagnosisText = `${resData.teaserFree}\n\n${resData.hookBeforeLock}`;
-        await fetch(`${window.location.origin}/api/line/push-result`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ idToken, resultType: pendingType, diagnosisText })
-        });
-      } catch (_) {}
-    })();
+    try { sessionStorage.removeItem("liff_pending_push"); } catch (_) {}
   }, []);
 
   const lineQrSrc = getLineQrSrc();
