@@ -1224,7 +1224,7 @@ export default function App() {
   }, [screen, resultKey]);
 
   useEffect(() => {
-    if (resultKey && resultKey === quizResultKeyRef.current) {
+    if (resultKey) {
       writeStoredOshiType(resultKey);
     }
   }, [resultKey]);
