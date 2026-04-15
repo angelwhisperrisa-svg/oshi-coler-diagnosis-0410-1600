@@ -1161,6 +1161,8 @@ export default function App() {
   const shouldSyncQuizResultUrlRef = useRef(false);
   /** 診断完了直後のみ LINE Push を1回だけ送る（深リンク再表示では送らない） */
   const shouldSendLinePushRef = useRef(false);
+  /** クイズ計算で確定した resultKey のみ localStorage に書くための照合用 */
+  const quizResultKeyRef = useRef("");
 
   const [screen, setScreen] = useState("welcome");
   const [welcomeMuted, setWelcomeMuted] = useState(true);
@@ -1219,7 +1221,9 @@ export default function App() {
   }, [screen, resultKey]);
 
   useEffect(() => {
-    if (resultKey) writeStoredOshiType(resultKey);
+    if (resultKey && resultKey === quizResultKeyRef.current) {
+      writeStoredOshiType(resultKey);
+    }
   }, [resultKey]);
 
   useEffect(() => {
@@ -1316,6 +1320,13 @@ export default function App() {
       return;
     }
     const topResultKey = computeResultFromScores(nextScores);
+    // 診断完了時点で即座に URL へ type を確定させる
+    if (typeof window !== "undefined") {
+      const base = (publicUrl || "").replace(/\/$/, "");
+      const qs = `?type=${encodeURIComponent(topResultKey)}&mode=free`;
+      window.history.replaceState({}, "", base ? `${base}/result${qs}` : `/result${qs}`);
+    }
+    quizResultKeyRef.current = topResultKey;
     setResultKey(topResultKey);
     setResultModeFull(false);
     shouldSendLinePushRef.current = true;
