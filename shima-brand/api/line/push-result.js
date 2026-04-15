@@ -74,7 +74,7 @@ async function verifyIdToken(idToken, channelId) {
 
 async function linkUserRichMenu({ accessToken, lineUserId, resultType }) {
   const richMenuId = RICH_MENU_ID_BY_TYPE[resultType];
-  if (!richMenuId) return { ok: false, skipped: true, reason: "missing_richmenu_id" };
+  if (!richMenuId) return { ok: false, skipped: true, reason: "missing_richmenu_id", richMenuId: "" };
 
   const endpoint = `https://api.line.me/v2/bot/user/${encodeURIComponent(lineUserId)}/richmenu/${encodeURIComponent(richMenuId)}`;
   for (let attempt = 1; attempt <= 3; attempt += 1) {
@@ -84,13 +84,13 @@ async function linkUserRichMenu({ accessToken, lineUserId, resultType }) {
         Authorization: `Bearer ${accessToken}`
       }
     });
-    if (r.ok) return { ok: true, attempt };
+    if (r.ok) return { ok: true, attempt, richMenuId };
     const detail = await r.text();
     if (attempt === 3) {
-      return { ok: false, status: r.status, detail: detail.slice(0, 500), attempt };
+      return { ok: false, status: r.status, detail: detail.slice(0, 500), attempt, richMenuId };
     }
   }
-  return { ok: false, reason: "unknown" };
+  return { ok: false, reason: "unknown", richMenuId };
 }
 
 export default async function handler(req, res) {
@@ -168,14 +168,27 @@ export default async function handler(req, res) {
   }
 
   const richMenuLinkResult = await linkUserRichMenu({ accessToken, lineUserId, resultType });
+  console.info("LINE rich menu link trace", {
+    resultType,
+    richMenuId: richMenuLinkResult.richMenuId || "",
+    ok: !!richMenuLinkResult.ok,
+    attempt: richMenuLinkResult.attempt || null,
+    reason: richMenuLinkResult.reason || null
+  });
   if (!richMenuLinkResult.ok) {
     console.warn("LINE rich menu link skipped/failed", {
       resultType,
+      richMenuId: richMenuLinkResult.richMenuId || "",
       status: richMenuLinkResult.status,
       detail: richMenuLinkResult.detail,
       reason: richMenuLinkResult.reason
     });
   }
 
-  res.status(200).json({ ok: true, richMenuLinkResult });
+  res.status(200).json({
+    ok: true,
+    resultType,
+    richMenuId: richMenuLinkResult.richMenuId || "",
+    richMenuLinkResult
+  });
 }
