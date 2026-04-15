@@ -74,14 +74,6 @@ function getBaseShopUrlForType(typeKey) {
   return fallback;
 }
 
-/** リッチメニュー・広告用の「一本URL」。同一ブラウザで診断済みなら保存 type へ分岐（未保存時はトップへ誘導）。 */
-function buildMagicAutoResultUrl(modeFull) {
-  if (typeof window === "undefined") return "";
-  const prefix = (publicUrl || "").replace(/\/$/, "");
-  const mode = modeFull ? "full" : "free";
-  return `${window.location.origin}${prefix}/result?auto=true&mode=${mode}`;
-}
-
 /**
  * リッチメニュー等で開いても `liff.isInClient()` が false になる端末がある。
  * User-Agent で LINE 内蔵ブラウザを拾い、ログイン・友だち確認フローに進める。
@@ -1120,6 +1112,8 @@ export default function App() {
   const deepLinkConsumedRef = useRef(false);
   /** 診断（クイズ）完了後だけ URL を /result?type=&mode=free に同期する */
   const shouldSyncQuizResultUrlRef = useRef(false);
+  /** 診断完了直後のみ LINE Push を1回だけ送る（深リンク再表示では送らない） */
+  const shouldSendLinePushRef = useRef(false);
 
   const [screen, setScreen] = useState("welcome");
   const [welcomeMuted, setWelcomeMuted] = useState(true);
@@ -1146,6 +1140,7 @@ export default function App() {
     const p = pendingDeepLinkRef.current;
     if (p.autoMissingStorage) {
       deepLinkConsumedRef.current = true;
+      shouldSendLinePushRef.current = false;
       if (typeof window !== "undefined") {
         const base = (publicUrl || "").replace(/\/$/, "");
         window.history.replaceState({}, "", base ? `${base}/` : "/");
@@ -1155,6 +1150,7 @@ export default function App() {
     }
     if (p.showResult && p.resultType) {
       deepLinkConsumedRef.current = true;
+      shouldSendLinePushRef.current = false;
       setResultKey(p.resultType);
       setResultModeFull(Boolean(p.modeFull));
       setScreen("result");
@@ -1260,6 +1256,7 @@ export default function App() {
   };
 
   const startQuiz = () => {
+    shouldSendLinePushRef.current = false;
     setScreen("quiz");
     setCurrentQ(0);
     setScores(initialScores);
@@ -1278,12 +1275,14 @@ export default function App() {
     const topResultKey = computeResultFromScores(nextScores);
     setResultKey(topResultKey);
     setResultModeFull(false);
+    shouldSendLinePushRef.current = true;
     shouldSyncQuizResultUrlRef.current = true;
     setScreen("calculating");
   };
 
   const resetDiagnosis = () => {
     linePushSentRef.current = false;
+    shouldSendLinePushRef.current = false;
     shouldSyncQuizResultUrlRef.current = false;
     clearStoredOshiType();
     if (typeof window !== "undefined") {
@@ -1306,6 +1305,8 @@ export default function App() {
     if (screen !== "result" || !resultKey) return;
     if (!REACT_APP_LIFF_ID) return;
     if (linePushSentRef.current) return;
+    if (!shouldSendLinePushRef.current) return;
+    shouldSendLinePushRef.current = false;
 
     let cancelled = false;
     (async () => {
@@ -1346,7 +1347,7 @@ export default function App() {
     <div className="line-cta-hero">
       <p className="line-cta-hero-title">{LINE_BRAND}</p>
       <p className="line-cta-hero-sub">
-        診断後の続き・キャンペーン・お知らせは公式LINEからお届けします。QRコードを読み取るか、下のボタンで友だち追加してください。
+        フル鑑定の続きはLINEで受け取れます。まずは公式LINEを登録してください。QRコードを読み取るか、下のボタンで友だち追加できます。
       </p>
       <img className="line-qr-big" src={lineQrSrc} alt={`${LINE_BRAND}のQRコード`} width={300} height={300} />
       <a className="line-cta-huge-btn" href={LINE_OFFICIAL_URL} target="_blank" rel="noopener noreferrer">
@@ -1357,7 +1358,6 @@ export default function App() {
 
   const renderOshiResultCard = (res, isFull, typeKey) => {
     const baseShopUrl = getBaseShopUrlForType(typeKey);
-    const fullResultHref = buildMagicAutoResultUrl(true) || LINE_OFFICIAL_URL;
     const header = (
       <>
         <div className="result-label">YOUR OSHI COLOR</div>
@@ -1387,6 +1387,7 @@ export default function App() {
               <p className="result-free-chunk">{res.fullBody}</p>
             </div>
           </div>
+          {renderLineAcquisitionBlock()}
           <div className="result-base-cta-wrap">
             <a
               className="result-base-cta"
@@ -1397,7 +1398,6 @@ export default function App() {
               {`BASE：${res.name}のフル鑑定`}
             </a>
           </div>
-          {renderLineAcquisitionBlock()}
           <div className="result-retry-row">
             <button type="button" className="retry-btn" onClick={resetDiagnosis}>
               もう一度、推し色を見つける
@@ -1422,18 +1422,20 @@ export default function App() {
           </div>
           <div className="lock-overlay">
             <div className="lock-icon" aria-hidden>🔒</div>
-            <div className="lock-title">LINE登録後はリッチメニューから色別の無料鑑定へ。続きはフル鑑定ページへ</div>
-            <a
-              className="line-unlock-btn"
-              href={fullResultHref}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              フル鑑定ページを開く
-            </a>
+            <div className="lock-title">LINE登録後はリッチメニューから色別の無料鑑定を受け取れます。</div>
           </div>
         </div>
         {renderLineAcquisitionBlock()}
+        <div className="result-base-cta-wrap">
+          <a
+            className="result-base-cta"
+            href={baseShopUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {`BASE：${res.name}のフル鑑定`}
+          </a>
+        </div>
         <div className="result-retry-row">
           <button type="button" className="retry-btn" onClick={resetDiagnosis}>
             もう一度、推し色を見つける

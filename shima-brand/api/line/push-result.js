@@ -115,7 +115,7 @@ export default async function handler(req, res) {
       ? `\n\n── 鑑定メモ ──\n${diagnosisText.trim().slice(0, 3500)}`
       : "";
 
-  const block1 = `【推し色診断・結果】\nあなたの推し色は「${label}」タイプです。\n\n${serverBody}${clientExtra}\n\n▼フル鑑定ページ\n${fullUrl}`;
+  const block1 = `【推し色診断・結果】\nあなたの推し色は「${label}」タイプです。\n\n${serverBody}${clientExtra}\n\nこのメッセージで診断は完了です。続きはLINEのリッチメニューからご利用ください。\n\n▼フル鑑定ページ\n${fullUrl}`;
 
   const messages = splitLineMessages(block1);
 
