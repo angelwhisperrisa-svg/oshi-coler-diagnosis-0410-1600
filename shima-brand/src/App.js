@@ -15,6 +15,17 @@ const LINE_BRAND = "薫凛香房 公式LINE";
 /** 診断タイプ保持（リッチメニュー等の /result?auto=true から分岐するため） */
 const OSHI_RESULT_STORAGE_KEY = "shima_oshi_result_v1";
 
+function readStoredOshiType() {
+  try {
+    if (typeof window === "undefined") return null;
+    const raw = window.localStorage.getItem(OSHI_RESULT_STORAGE_KEY);
+    if (raw && RESULT_TYPE_KEYS.includes(raw)) return raw;
+  } catch (_) {
+    /* private mode 等 */
+  }
+  return null;
+}
+
 function writeStoredOshiType(typeKey) {
   try {
     if (typeof window === "undefined") return;
@@ -108,17 +119,19 @@ function parseInitialResultRoute() {
   if (isAuto) {
     const typeParam = params.get("type");
     const explicitType = typeParam && RESULT_TYPE_KEYS.includes(typeParam) ? typeParam : null;
+    const storedType = readStoredOshiType();
     const modeParam = (params.get("mode") || "full").toLowerCase();
     const modeFull = modeParam !== "free";
-    if (explicitType) {
+    const resolvedType = explicitType || storedType;
+    if (resolvedType) {
       return {
         showResult: true,
-        resultType: explicitType,
+        resultType: resolvedType,
         modeFull,
         replaceUrlWithCanonical: true
       };
     }
-    // auto=true は必ず type を要求。未指定時は誤着地防止のためトップへ戻す。
+    // type も保存結果も無い場合はトップへ戻す（リッチメニューの空振り対策）
     return { ...empty, autoMissingStorage: true };
   }
 
@@ -1095,24 +1108,6 @@ const styles = `
     background: #fff;
     padding: 8px;
   }
-  .line-cta-huge-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    max-width: 320px;
-    margin: 0 auto;
-    padding: 18px 20px;
-    border-radius: 999px;
-    background: #06C755;
-    color: #fff !important;
-    font-size: clamp(16px, 4.2vw, 18px);
-    font-weight: 800;
-    text-decoration: none;
-    box-shadow: 0 12px 32px rgba(6, 199, 85, 0.45);
-    min-height: 58px;
-    line-height: 1.3;
-  }
   .line-result-open-btn {
     display: inline-flex;
     align-items: center;
@@ -1460,11 +1455,6 @@ export default function App() {
             </div>
           </div>
           {renderBaseCta()}
-          <div className="result-retry-row">
-            <button type="button" className="retry-btn" onClick={resetDiagnosis}>
-              もう一度、推し色を見つける
-            </button>
-          </div>
         </section>
       );
     }
