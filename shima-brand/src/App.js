@@ -1180,12 +1180,30 @@ export default function App() {
   const welcomeSilentSkipTimerRef = useRef(null);
   const welcomeEngagedRef = useRef(false);
   const linePushSentRef = useRef(false);
+  const liffRef = useRef(null);
 
   const progress = Math.round((currentQ / questions.length) * 100);
   const currentQuestion = questions[currentQ];
   const result = resultKey ? results[resultKey] : null;
 
   const immersive = screen === "welcome" || screen === "calculating";
+
+  // アプリ起動時（liff.stateがURLにある時点）でLIFFを初期化
+  useEffect(() => {
+    if (!REACT_APP_LIFF_ID) return;
+    if (!isLikelyLineInAppBrowser()) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const liff = (await import("@line/liff")).default;
+        await liff.init({ liffId: REACT_APP_LIFF_ID, withLoginOnExternalBrowser: false });
+        if (!cancelled) liffRef.current = liff;
+      } catch (e) {
+        console.warn("[liff.init]", String(e));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   useLayoutEffect(() => {
     if (deepLinkConsumedRef.current) return;
@@ -1364,46 +1382,27 @@ export default function App() {
 
   useEffect(() => {
     if (screen !== "result" || !resultKey) return;
-    if (!REACT_APP_LIFF_ID) return;
     if (linePushSentRef.current) return;
     if (!shouldSendLinePushRef.current) return;
     shouldSendLinePushRef.current = false;
 
-    let cancelled = false;
-    (async () => {
-      try {
-        // init前にUAでLINEブラウザを判定（init不要・リダイレクト防止）
-        if (!isLikelyLineInAppBrowser()) return;
+    const liff = liffRef.current;
+    if (!liff) return;
+    if (!liff.isInClient()) return;
 
-        const liff = (await import("@line/liff")).default;
-        await liff.init({
-          liffId: REACT_APP_LIFF_ID,
-          withLoginOnExternalBrowser: false
-        });
+    const resData = results[resultKey];
+    const diagnosisText = `${resData.teaserFree}\n\n${resData.hookBeforeLock}`;
+    const base = (publicUrl || "").replace(/\/$/, "");
+    const resultUrl = `${window.location.origin}${base}/result?type=${encodeURIComponent(resultKey)}&mode=free`;
 
-        if (cancelled) return;
-        if (!liff.isInClient()) return;
-
-        const resData = results[resultKey];
-        const diagnosisText = `${resData.teaserFree}\n\n${resData.hookBeforeLock}`;
-        const base = (publicUrl || "").replace(/\/$/, "");
-        const resultUrl = `${window.location.origin}${base}/result?type=${encodeURIComponent(resultKey)}&mode=free`;
-
-        await liff.sendMessages([
-          {
-            type: "text",
-            text: `${diagnosisText}\n\n🔗 結果を見る：${resultUrl}`
-          }
-        ]);
-        linePushSentRef.current = true;
-      } catch (e) {
-        console.warn("[liff.sendMessages]", String(e));
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
+    liff.sendMessages([{
+      type: "text",
+      text: `${diagnosisText}\n\n🔗 結果を見る：${resultUrl}`
+    }]).then(() => {
+      linePushSentRef.current = true;
+    }).catch((e) => {
+      console.warn("[liff.sendMessages]", String(e));
+    });
   }, [screen, resultKey]);
 
   // liff_pending_push の古いデータをクリア（旧 liff.login() リダイレクト方式の残骸）
