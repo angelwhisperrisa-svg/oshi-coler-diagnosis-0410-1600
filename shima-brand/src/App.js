@@ -1397,9 +1397,7 @@ export default function App() {
         ]);
         linePushSentRef.current = true;
       } catch (e) {
-        if (process.env.NODE_ENV === "development") {
-          console.warn("[liff.sendMessages]", e);
-        }
+        console.warn("[liff.sendMessages]", String(e));
       }
     })();
 
