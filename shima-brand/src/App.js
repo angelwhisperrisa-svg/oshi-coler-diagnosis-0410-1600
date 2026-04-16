@@ -6,7 +6,7 @@ const VIDEO = {
   final: `${publicUrl}/videos/C_Oshiiro_Thank_you_and_invite_1080p.mp4`
 };
 const LINE_OFFICIAL_URL = "https://line.me/R/ti/p/@877xrsvw";
-const LINE_OA_ID = process.env.REACT_APP_LINE_OA_ID || "@2009786397";
+const BASE_FULL_URL = process.env.REACT_APP_BASE_FULL_URL || "https://thebase.in/";
 
 const RESULT_TYPE_KEYS = ["mint", "rose", "lavender", "ivory", "skyblue"];
 const REACT_APP_LIFF_ID = process.env.REACT_APP_LIFF_ID || "";
@@ -14,6 +14,17 @@ const LINE_BRAND = "薫凛香房 公式LINE";
 
 /** 診断タイプ保持（リッチメニュー等の /result?auto=true から分岐するため） */
 const OSHI_RESULT_STORAGE_KEY = "shima_oshi_result_v1";
+
+function readStoredOshiType() {
+  try {
+    if (typeof window === "undefined") return null;
+    const raw = window.localStorage.getItem(OSHI_RESULT_STORAGE_KEY);
+    if (raw && RESULT_TYPE_KEYS.includes(raw)) return raw;
+  } catch (_) {
+    /* ignore */
+  }
+  return null;
+}
 
 function normalizeTypeKey(v) {
   if (!v || typeof v !== "string") return null;
@@ -25,7 +36,7 @@ function writeStoredOshiType(typeKey) {
   try {
     if (typeof window === "undefined") return;
     if (!typeKey || !RESULT_TYPE_KEYS.includes(typeKey)) return;
-    window.sessionStorage.setItem(OSHI_RESULT_STORAGE_KEY, typeKey);
+    window.localStorage.setItem(OSHI_RESULT_STORAGE_KEY, typeKey);
   } catch (_) {
     /* ignore */
   }
@@ -34,21 +45,10 @@ function writeStoredOshiType(typeKey) {
 function clearStoredOshiType() {
   try {
     if (typeof window === "undefined") return;
-    window.sessionStorage.removeItem(OSHI_RESULT_STORAGE_KEY);
+    window.localStorage.removeItem(OSHI_RESULT_STORAGE_KEY);
   } catch (_) {
     /* ignore */
   }
-}
-
-function readStoredOshiType() {
-  try {
-    if (typeof window === "undefined") return null;
-    const raw = window.sessionStorage.getItem(OSHI_RESULT_STORAGE_KEY);
-    if (raw && RESULT_TYPE_KEYS.includes(raw)) return raw;
-  } catch (_) {
-    /* ignore */
-  }
-  return null;
 }
 
 function getLineQrSrc() {
@@ -57,7 +57,10 @@ function getLineQrSrc() {
   return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=8&data=${encodeURIComponent(LINE_OFFICIAL_URL)}`;
 }
 
-/** 診断で確定した色を URL に埋めて LINE 側へ渡す。 */
+/**
+ * 診断で確定した色を URL に埋めて LINE 側へ渡す。
+ * localStorage 依存ではなく type クエリ優先で着地を固定する。
+ */
 function buildLineResultUrl(typeKey, mode = "full") {
   const normalizedType = normalizeTypeKey(typeKey);
   if (!normalizedType) return "";
@@ -82,6 +85,16 @@ function computeResultFromScores(sc) {
 /**
  * 各色の BASE（有料・フル鑑定）URL。ボタンは常にこの関数だけを参照する（色ごとの if 分岐をここに集約）。
  */
+function getBaseShopUrlForType(typeKey) {
+  const fallback = process.env.REACT_APP_BASE_FULL_URL || BASE_FULL_URL;
+  if (!typeKey || !RESULT_TYPE_KEYS.includes(typeKey)) return fallback;
+  if (typeKey === "mint") return process.env.REACT_APP_BASE_MINT || fallback;
+  if (typeKey === "rose") return process.env.REACT_APP_BASE_ROSE || fallback;
+  if (typeKey === "lavender") return process.env.REACT_APP_BASE_LAVENDER || fallback;
+  if (typeKey === "ivory") return process.env.REACT_APP_BASE_IVORY || fallback;
+  if (typeKey === "skyblue") return process.env.REACT_APP_BASE_SKYBLUE || fallback;
+  return fallback;
+}
 
 /**
  * リッチメニュー等で開いても `liff.isInClient()` が false になる端末がある。
@@ -111,22 +124,20 @@ function parseInitialResultRoute() {
   const isAuto = autoRaw === "true" || autoRaw === "1";
 
   if (isAuto) {
+    const explicitType = normalizeTypeKey(params.get("type"));
+    const storedType = normalizeTypeKey(readStoredOshiType());
     const modeParam = (params.get("mode") || "full").toLowerCase();
     const modeFull = modeParam !== "free";
-
-    // 優先順位①：URL の type パラメータ（最優先）
-    const urlType = normalizeTypeKey(params.get("type"));
-    if (urlType) {
-      return { showResult: true, resultType: urlType, modeFull, replaceUrlWithCanonical: true };
+    const resolvedType = explicitType || storedType;
+    if (resolvedType) {
+      return {
+        showResult: true,
+        resultType: resolvedType,
+        modeFull,
+        replaceUrlWithCanonical: true
+      };
     }
-
-    // 優先順位②：sessionStorage（同一セッション内の診断結果）
-    const sessionType = normalizeTypeKey(readStoredOshiType());
-    if (sessionType) {
-      return { showResult: true, resultType: sessionType, modeFull, replaceUrlWithCanonical: true };
-    }
-
-    // 優先順位③：何もなければ表示しない（デフォルト値禁止）
+    // type も保存結果も無い場合のみ空振り
     return { ...empty, autoMissingStorage: true };
   }
 
@@ -1154,8 +1165,6 @@ export default function App() {
   const shouldSyncQuizResultUrlRef = useRef(false);
   /** 診断完了直後のみ LINE Push を1回だけ送る（深リンク再表示では送らない） */
   const shouldSendLinePushRef = useRef(false);
-  /** クイズ計算で確定した resultKey のみ localStorage に書くための照合用 */
-  const quizResultKeyRef = useRef("");
 
   const [screen, setScreen] = useState("welcome");
   const [welcomeMuted, setWelcomeMuted] = useState(true);
@@ -1170,8 +1179,6 @@ export default function App() {
   const welcomeSilentSkipTimerRef = useRef(null);
   const welcomeEngagedRef = useRef(false);
   const linePushSentRef = useRef(false);
-  const liffRef = useRef(null);
-  const [liffReady, setLiffReady] = useState(false);
 
   const progress = Math.round((currentQ / questions.length) * 100);
   const currentQuestion = questions[currentQ];
@@ -1179,29 +1186,17 @@ export default function App() {
 
   const immersive = screen === "welcome" || screen === "calculating";
 
-  // アプリ起動時（liff.stateがURLにある時点）でLIFFを初期化
-  useEffect(() => {
-    if (!REACT_APP_LIFF_ID) return;
-    if (!isLikelyLineInAppBrowser()) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const liff = (await import("@line/liff")).default;
-        await liff.init({ liffId: REACT_APP_LIFF_ID, withLoginOnExternalBrowser: false });
-        if (!cancelled) { liffRef.current = liff; setLiffReady(true); }
-      } catch (e) {
-        console.warn("[liff.init]", String(e));
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
-
   useLayoutEffect(() => {
     if (deepLinkConsumedRef.current) return;
-    deepLinkConsumedRef.current = true; // 先に確定させ、再侵入を完全に防ぐ
-
     const p = pendingDeepLinkRef.current;
+    if (p.autoMissingStorage) {
+      deepLinkConsumedRef.current = true;
+      shouldSendLinePushRef.current = false;
+      setScreen("start");
+      return;
+    }
     if (p.showResult && p.resultType) {
+      deepLinkConsumedRef.current = true;
       shouldSendLinePushRef.current = false;
       setResultKey(p.resultType);
       setResultModeFull(Boolean(p.modeFull));
@@ -1214,7 +1209,6 @@ export default function App() {
         window.history.replaceState({}, "", path);
       }
     }
-    // autoMissingStorage による setScreen("start") は削除（初期化処理の再侵入防止）
   }, []);
 
   useEffect(() => {
@@ -1229,9 +1223,7 @@ export default function App() {
   }, [screen, resultKey]);
 
   useEffect(() => {
-    if (resultKey) {
-      writeStoredOshiType(resultKey);
-    }
+    if (resultKey) writeStoredOshiType(resultKey);
   }, [resultKey]);
 
   useEffect(() => {
@@ -1261,19 +1253,11 @@ export default function App() {
   useEffect(() => {
     if (screen !== "calculating") return;
     const v = finalVideoRef.current;
-    if (!v) {
-      setScreen("result");
-      return;
-    }
+    if (!v) return;
     v.muted = false;
     v.currentTime = 0;
     const p = v.play();
-    if (p && typeof p.catch === "function") {
-      p.catch(() => {
-        // 音あり自動再生がブロックされた場合は直接resultへ
-        setScreen("result");
-      });
-    }
+    if (p && typeof p.catch === "function") p.catch(() => {});
   }, [screen]);
 
   const handleWelcomeSoundOn = () => {
@@ -1323,7 +1307,7 @@ export default function App() {
     setScreen("quiz");
     setCurrentQ(0);
     setScores(initialScores);
-    // setResultKey("") は削除：resultKey クリアによる useEffect 再発火・sessionStorage 破壊を防ぐ
+    setResultKey("");
   };
 
   const selectChoice = (scoreMap) => {
@@ -1336,13 +1320,6 @@ export default function App() {
       return;
     }
     const topResultKey = computeResultFromScores(nextScores);
-    // 診断完了時点で即座に URL へ type を確定させる
-    if (typeof window !== "undefined") {
-      const base = (publicUrl || "").replace(/\/$/, "");
-      const qs = `?type=${encodeURIComponent(topResultKey)}&mode=free`;
-      window.history.replaceState({}, "", base ? `${base}/result${qs}` : `/result${qs}`);
-    }
-    quizResultKeyRef.current = topResultKey;
     setResultKey(topResultKey);
     setResultModeFull(false);
     shouldSendLinePushRef.current = true;
@@ -1373,33 +1350,49 @@ export default function App() {
 
   useEffect(() => {
     if (screen !== "result" || !resultKey) return;
+    if (!REACT_APP_LIFF_ID) return;
     if (linePushSentRef.current) return;
     if (!shouldSendLinePushRef.current) return;
-    if (!liffReady || !liffRef.current) return;
     shouldSendLinePushRef.current = false;
 
-    const liff = liffRef.current;
-    const resData = results[resultKey];
-    const colorName = resData.name || resultKey;
+    let cancelled = false;
+    (async () => {
+      try {
+        const liff = (await import("@line/liff")).default;
+        // 外部ブラウザで勝手に LINE ログイン画面へ飛ばさない
+        await liff.init({ liffId: REACT_APP_LIFF_ID, withLoginOnExternalBrowser: false });
+        if (cancelled) return;
+        const inLineUi = liff.isInClient() || isLikelyLineInAppBrowser();
+        if (!inLineUi || !liff.isLoggedIn()) return;
+        const idToken = liff.getIDToken();
+        if (!idToken) return;
 
-    liff.sendMessages([{
-      type: "text",
-      text: colorName
-    }]).then(() => {
-      linePushSentRef.current = true;
-    }).catch((e) => {
-      console.warn("[liff.sendMessages]", String(e));
-    });
-  }, [screen, resultKey, liffReady]);
+        const resData = results[resultKey];
+        const diagnosisText = resultModeFull
+          ? resData.fullBody
+          : `${resData.teaserFree}\n\n${resData.hookBeforeLock}`;
 
-  // liff_pending_push の古いデータをクリア（旧 liff.login() リダイレクト方式の残骸）
-  useEffect(() => {
-    try { sessionStorage.removeItem("liff_pending_push"); } catch (_) {}
-  }, []);
+        const res = await fetch(`${window.location.origin}/api/line/push-result`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ idToken, resultType: resultKey, diagnosisText })
+        });
+        if (res.ok) linePushSentRef.current = true;
+      } catch (e) {
+        if (process.env.NODE_ENV === "development") {
+          console.warn("[line push]", e);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [screen, resultKey, resultModeFull]);
 
   const lineQrSrc = getLineQrSrc();
   const renderLineAcquisitionBlock = (typeKey) => {
-    const lineResultUrl = buildLineResultUrl(typeKey, "full");
+    const lineResultUrl = `https://line.me/R/oaMessage/@877xrsvw/?text=color%3D${typeKey}`;
     return (
     <div className="line-cta-hero">
       <p className="line-cta-hero-title">{LINE_BRAND}</p>
@@ -1417,16 +1410,20 @@ export default function App() {
   };
 
   const renderOshiResultCard = (res, isFull, typeKey) => {
-    const lineOaMessageUrl = `https://line.me/R/oaMessage/${encodeURIComponent(LINE_OA_ID)}/?text=${encodeURIComponent("color=" + typeKey)}`;
-    const renderLineSendBtn = () => (
+    const baseShopUrl = getBaseShopUrlForType(typeKey);
+    const renderBaseCta = () => (
       <div className="result-base-cta-wrap">
+        <div className="result-base-guide">
+          <p className="result-base-guide-title">LINE登録の次は、こちらからフル鑑定へ</p>
+          <p className="result-base-guide-sub">あなたの推し色に合わせた詳細診断をBASEで確認できます。</p>
+        </div>
         <a
           className="result-base-cta"
-          href={lineOaMessageUrl}
+          href={baseShopUrl}
           target="_blank"
           rel="noopener noreferrer"
         >
-          {`▶ LINEに${res.name}の結果を送る`}
+          {`▶ BASEで${res.name}のフル鑑定を見る`}
         </a>
       </div>
     );
@@ -1459,7 +1456,7 @@ export default function App() {
               <p className="result-free-chunk">{res.fullBody}</p>
             </div>
           </div>
-          {renderLineSendBtn()}
+          {renderBaseCta()}
         </section>
       );
     }
@@ -1483,7 +1480,7 @@ export default function App() {
           </div>
         </div>
         {renderLineAcquisitionBlock(typeKey)}
-        {renderLineSendBtn()}
+        {renderBaseCta()}
         <div className="result-retry-row">
           <button type="button" className="retry-btn" onClick={resetDiagnosis}>
             もう一度、推し色を見つける

@@ -21,7 +21,562 @@
   --sand:        #f0e8d8;
   --sand2:       #e8dcc8;
   --linen:       #ede4d4;
-  --gold:        #c9a84c;
+  --gold:        #c9a84c;import { useState } from "react";
+
+const styles = `
+  @import url('https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@300;400;500;700&family=Shippori+Mincho:wght@400;600;800&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #ede8f0;
+    color: #333333;
+    font-family: 'Zen Maru Gothic', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .bg-deco {
+    position: fixed; top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none; z-index: 0;
+    overflow: hidden;
+  }
+
+  .petal {
+    position: absolute;
+    font-size: 18px;
+    opacity: 0;
+    animation: floatPetal linear infinite;
+  }
+
+  .butterfly {
+    position: absolute;
+    font-size: 16px;
+    opacity: 0;
+    animation: floatButterfly ease-in-out infinite;
+  }
+
+  @keyframes floatPetal {
+    0%   { transform: translateY(-40px) rotate(0deg); opacity: 0; }
+    10%  { opacity: 0.55; }
+    90%  { opacity: 0.4; }
+    100% { transform: translateY(110vh) rotate(360deg); opacity: 0; }
+  }
+
+  @keyframes floatButterfly {
+    0%   { transform: translate(0,0) rotate(-8deg); opacity: 0; }
+    15%  { opacity: 0.5; }
+    50%  { transform: translate(30px,-40px) rotate(8deg); opacity: 0.5; }
+    85%  { opacity: 0.4; }
+    100% { transform: translate(-10px,80px) rotate(-5deg); opacity: 0; }
+  }
+
+  .petal:nth-child(1)  { left: 8%;  animation-duration: 9s;  animation-delay: 0s;   font-size: 16px; }
+  .petal:nth-child(2)  { left: 20%; animation-duration: 11s; animation-delay: 1.5s; font-size: 14px; }
+  .petal:nth-child(3)  { left: 35%; animation-duration: 8s;  animation-delay: 3s;   font-size: 18px; }
+  .petal:nth-child(4)  { left: 55%; animation-duration: 13s; animation-delay: 0.8s; font-size: 13px; }
+  .petal:nth-child(5)  { left: 70%; animation-duration: 10s; animation-delay: 2.2s; font-size: 17px; }
+  .petal:nth-child(6)  { left: 85%; animation-duration: 7s;  animation-delay: 1s;   font-size: 15px; }
+  .petal:nth-child(7)  { left: 45%; animation-duration: 12s; animation-delay: 4s;   font-size: 14px; }
+  .petal:nth-child(8)  { left: 92%; animation-duration: 9s;  animation-delay: 5s;   font-size: 16px; }
+  .butterfly:nth-child(9)  { left: 12%; top: 15%; animation-duration: 7s;  animation-delay: 0.5s; }
+  .butterfly:nth-child(10) { left: 75%; top: 25%; animation-duration: 9s;  animation-delay: 2s; }
+  .butterfly:nth-child(11) { left: 50%; top: 60%; animation-duration: 11s; animation-delay: 3.5s; }
+  .butterfly:nth-child(12) { left: 88%; top: 45%; animation-duration: 8s;  animation-delay: 1.2s; }
+
+  .oshi-container {
+    background: #ffffffd0;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+    position: relative; z-index: 1;
+    max-width: 600px; margin: 0 auto;
+    padding: 48px 28px 88px;
+  }
+
+  .oshi-header { text-align: center; margin-bottom: 48px; animation: fadeDown 0.8s ease both; }
+  .oshi-header .sub { font-size: 11px; letter-spacing: 2px; color: #5a4a85; text-transform: uppercase; margin-bottom: 16px; }
+  .oshi-header h1 {
+    font-family: 'Shippori Mincho', serif;
+    font-size: clamp(28px, 8vw, 44px); font-weight: 700;
+    background: linear-gradient(135deg, #f472b6 0%, #e879f9 40%, #c084fc 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    line-height: 1.3; margin-bottom: 16px;
+  }
+  .oshi-header .desc { font-size: 13px; color: #6B5B95; line-height: 1.8; }
+
+  .progress-wrap { margin-bottom: 32px; animation: fadeIn 0.6s ease both 0.3s; }
+  .progress-label { display: flex; justify-content: space-between; font-size: 11px; color: #6B5B95; margin-bottom: 8px; letter-spacing: 1px; }
+  .progress-bar { height: 3px; background: rgba(0,0,0,0.08); border-radius: 99px; overflow: hidden; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, #f472b6, #c084fc); border-radius: 99px; transition: width 0.5s cubic-bezier(0.4,0,0.2,1); }
+
+  .oshi-card { background: white; border: 1px solid rgba(200,180,220,0.2); border-radius: 20px; padding: 36px 32px; animation: slideUp 0.5s cubic-bezier(0.4,0,0.2,1) both; }
+  .question-num { font-size: 11px; letter-spacing: 3px; color: #c084fc; margin-bottom: 16px; }
+  .question-text { font-family: 'Shippori Mincho', serif; font-size: clamp(17px,4vw,21px); font-weight: 600; line-height: 1.7; margin-bottom: 32px; color: #222222; }
+
+  .choices { display: flex; flex-direction: column; gap: 12px; }
+  .choice-btn {
+    background: #faf7fd; border: 1px solid rgba(192,132,252,0.25); border-radius: 14px;
+    padding: 16px 20px; color: #444444; font-family: 'Zen Maru Gothic', sans-serif;
+    font-size: 14px; cursor: pointer; text-align: left; transition: all 0.25s ease;
+    display: flex; align-items: center; gap: 14px; line-height: 1.5; width: 100%;
+  }
+  .choice-btn:hover { background: rgba(232,180,232,0.15); border-color: rgba(232,130,232,0.5); transform: translateX(4px); }
+  .choice-btn.selected { background: rgba(232,180,232,0.25); border-color: rgba(200,100,220,0.6); color: #5a1a6a; }
+  .choice-icon { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; background: rgba(240,220,255,0.5); }
+
+  /* スタート画面 */
+  .start-screen { text-align: center; }
+  .start-visual { width: 180px; height: 180px; margin: 0 auto 36px; position: relative; }
+  .start-visual .orb {
+    width: 100%; height: 100%; border-radius: 50%;
+    background: conic-gradient(from 0deg, #f9a8c8 0%, #c8a8f0 15%, #a8c0f0 30%, #a8e8d0 45%, #d0e8a8 60%, #f0d8a8 75%, #f0a8b8 90%, #f9a8c8 100%);
+    filter: blur(2px) brightness(1.15) saturate(1.4);
+    opacity: 0.95;
+    animation: orbRotate 12s linear infinite;
+  }
+  @keyframes orbRotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+  .heart-wrap {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .heart-main {
+    font-size: 44px;
+    animation: heartPulse 2s ease-in-out infinite;
+    filter: drop-shadow(0 0 8px rgba(232,100,180,0.8)) drop-shadow(0 0 16px rgba(200,80,220,0.5));
+  }
+  @keyframes heartPulse {
+    0%, 100% { transform: scale(1); filter: drop-shadow(0 0 8px rgba(232,100,180,0.8)) drop-shadow(0 0 16px rgba(200,80,220,0.5)); }
+    50%       { transform: scale(1.18); filter: drop-shadow(0 0 14px rgba(232,100,180,1)) drop-shadow(0 0 28px rgba(200,80,220,0.8)); }
+  }
+
+  .sparkle { position: absolute; font-size: 13px; animation: sparkleTwinkle ease-in-out infinite; }
+  .sparkle:nth-child(1) { top: -18px; left: 50%; transform: translateX(-50%); animation-duration: 1.8s; animation-delay: 0s; }
+  .sparkle:nth-child(2) { top: 10px;  right: -18px; animation-duration: 2.2s; animation-delay: 0.4s; }
+  .sparkle:nth-child(3) { bottom: -18px; left: 50%; transform: translateX(-50%); animation-duration: 1.6s; animation-delay: 0.8s; }
+  .sparkle:nth-child(4) { top: 10px;  left: -18px; animation-duration: 2s;   animation-delay: 0.2s; }
+  .sparkle:nth-child(5) { top: -10px; right: -8px;  animation-duration: 1.5s; animation-delay: 1s; }
+  .sparkle:nth-child(6) { bottom: -8px; left: -10px; animation-duration: 2.4s; animation-delay: 0.6s; }
+  @keyframes sparkleTwinkle { 0%, 100% { opacity: 0.2; transform: scale(0.7); } 50% { opacity: 1; transform: scale(1.3); } }
+
+  .start-btn {
+    appearance: none; -webkit-appearance: none;
+    background: linear-gradient(135deg, #e8b4cc, #d4a8e0);
+    border: none; border-radius: 999px; padding: 18px 52px; color: white;
+    font-family: 'Shippori Mincho', serif; font-size: 16px; font-weight: 700;
+    cursor: pointer; letter-spacing: 3px; transition: all 0.3s ease; margin-top: 32px;
+    box-shadow: 0 6px 20px rgba(200,150,200,0.35);
+  }
+  .start-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(200,150,200,0.5); opacity: 0.95; }
+  .floating-note { font-size: 12px; color: #999999; margin-top: 16px; letter-spacing: 1px; }
+
+  /* 診断完了・登録画面 */
+  .capture-card { background: white; border: 1px solid rgba(200,180,220,0.2); border-radius: 24px; padding: 40px 28px; text-align: center; animation: fadeIn 0.8s ease both; }
+  .result-preview { position: relative; margin-bottom: 32px; }
+  .result-preview-color { width: 90px; height: 90px; border-radius: 50%; margin: 0 auto 16px; filter: blur(6px); opacity: 0.7; animation: pulse 2s ease infinite; }
+  @keyframes pulse { 0%, 100% { box-shadow: 0 0 20px rgba(232,180,232,0.4); } 50% { box-shadow: 0 0 40px rgba(232,180,232,0.7); } }
+  .result-preview-name { font-family: 'Shippori Mincho', serif; font-size: 28px; font-weight: 800; filter: blur(8px); color: #c084fc; margin-bottom: 8px; user-select: none; }
+  .result-preview-label { font-size: 11px; letter-spacing: 3px; color: #c084fc; margin-bottom: 20px; }
+  .result-teaser { background: linear-gradient(135deg, rgba(240,220,255,0.4), rgba(220,240,255,0.4)); border-radius: 14px; padding: 20px; margin-bottom: 8px; border: 1px solid rgba(192,132,252,0.2); }
+  .result-teaser-text { font-size: 14px; line-height: 1.9; color: #7a6a9a; }
+  .result-teaser-blur { font-size: 13px; color: #bbb; filter: blur(4px); user-select: none; margin-top: 6px; line-height: 1.7; }
+  .capture-divider { width: 40px; height: 1px; background: linear-gradient(90deg, transparent, rgba(192,132,252,0.4), transparent); margin: 28px auto; }
+  .capture-title { font-family: 'Shippori Mincho', serif; font-size: 20px; font-weight: 700; color: #5a3a7a; margin-bottom: 8px; }
+  .capture-subtitle { font-size: 13px; color: #999; line-height: 1.7; margin-bottom: 28px; }
+
+  .steps { display: flex; gap: 8px; margin-bottom: 28px; justify-content: center; }
+  .step { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #bbb; letter-spacing: 1px; }
+  .step.active { color: #9b6bc4; }
+  .step.done { color: #7aaa7a; }
+  .step-num { width: 22px; height: 22px; border-radius: 50%; background: rgba(192,132,252,0.15); border: 1px solid rgba(192,132,252,0.3); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; color: #bbb; }
+  .step.active .step-num { background: rgba(192,132,252,0.3); border-color: #c084fc; color: #9b6bc4; }
+  .step.done .step-num { background: rgba(100,200,100,0.2); border-color: #7aaa7a; color: #7aaa7a; }
+  .step-arrow { color: #ddd; font-size: 12px; }
+
+  .mail-section { margin-bottom: 20px; }
+  .mail-section-label { font-size: 11px; letter-spacing: 2px; color: #b47ad4; margin-bottom: 12px; text-align: left; }
+  .mail-required-badge { display: inline-block; background: rgba(232,100,100,0.1); border: 1px solid rgba(232,100,100,0.3); border-radius: 99px; padding: 2px 8px; font-size: 10px; color: #c06060; margin-left: 6px; letter-spacing: 1px; }
+  .mail-input-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .delivery-input { flex: 1; background: white; border: 1px solid rgba(192,132,252,0.3); border-radius: 12px; padding: 14px 16px; color: #333; font-family: 'Zen Maru Gothic', sans-serif; font-size: 14px; outline: none; transition: border-color 0.2s ease; }
+  .delivery-input::placeholder { color: #bbb; }
+  .delivery-input:focus { border-color: rgba(192,132,252,0.6); box-shadow: 0 0 0 3px rgba(192,132,252,0.08); }
+  .mail-submit-btn { width: 100%; padding: 16px; background: linear-gradient(135deg, #e8a0c8, #c084fc); border: none; border-radius: 14px; color: white; font-family: 'Shippori Mincho', serif; font-size: 15px; font-weight: 700; cursor: pointer; letter-spacing: 2px; transition: all 0.3s ease; box-shadow: 0 6px 20px rgba(192,132,252,0.35); margin-bottom: 12px; }
+  .mail-submit-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(192,132,252,0.45); }
+  .mail-submit-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+  .delivery-note { font-size: 11px; color: #aaa; line-height: 1.7; text-align: center; }
+
+  .line-result-btn { width: 100%; padding: 18px; background: linear-gradient(135deg, rgba(6,199,85,0.18), rgba(6,199,85,0.08)); border: 1px solid rgba(6,199,85,0.35); border-radius: 14px; color: #2a9a50; font-family: 'Zen Maru Gothic', sans-serif; font-size: 15px; font-weight: 500; letter-spacing: 1px; cursor: pointer; transition: all 0.25s ease; display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 10px; }
+  .line-result-btn:hover { background: linear-gradient(135deg, rgba(6,199,85,0.3), rgba(6,199,85,0.15)); transform: translateY(-2px); box-shadow: 0 8px 20px rgba(6,199,85,0.2); }
+  .line-icon { width: 24px; height: 24px; background: #06C755; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: bold; color: white; flex-shrink: 0; }
+  .skip-btn { background: none; border: none; color: #bbb; font-size: 12px; cursor: pointer; text-decoration: underline; letter-spacing: 1px; padding: 8px; width: 100%; font-family: 'Zen Maru Gothic', sans-serif; }
+  .skip-btn:hover { color: #999; }
+
+  .complete-section { text-align: center; animation: fadeInUp 0.5s ease both; }
+  .complete-icon { font-size: 40px; margin-bottom: 16px; }
+  .complete-title { font-family: 'Shippori Mincho', serif; font-size: 22px; font-weight: 700; color: #5a3a7a; margin-bottom: 12px; }
+  .complete-text { font-size: 14px; color: #888; line-height: 1.9; margin-bottom: 28px; }
+
+  .mail-success-inline { background: rgba(100,200,100,0.1); border: 1px solid rgba(100,200,100,0.3); border-radius: 10px; padding: 10px 14px; font-size: 12px; color: #5a9a5a; margin-bottom: 16px; animation: fadeInUp 0.3s ease both; }
+
+  /* 結果画面 */
+  .result-card { background: white; border: 1px solid rgba(200,180,220,0.2); border-radius: 24px; padding: 40px 32px; text-align: center; animation: fadeIn 0.8s ease both; }
+  .result-color-display { width: 120px; height: 120px; border-radius: 50%; margin: 0 auto 28px; animation: pulse 2s ease infinite; }
+  .result-label { font-size: 11px; letter-spacing: 4px; color: #c084fc; margin-bottom: 12px; }
+  .result-color-name { font-family: 'Shippori Mincho', serif; font-size: clamp(26px,7vw,36px); font-weight: 800; margin-bottom: 8px; line-height: 1.2; }
+  .result-color-sub { font-size: 13px; color: #888888; margin-bottom: 28px; letter-spacing: 2px; }
+  .result-divider { width: 40px; height: 1px; background: linear-gradient(90deg, transparent, rgba(192,132,252,0.4), transparent); margin: 0 auto 28px; }
+  .result-desc { font-size: 14px; line-height: 2; color: #6b6680; margin-bottom: 28px; text-align: left; }
+  .result-tags { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 32px; }
+  .tag { padding: 6px 14px; border-radius: 99px; font-size: 12px; letter-spacing: 1px; border: 1px solid rgba(192,132,252,0.3); background: rgba(240,220,255,0.3); color: #7a5a9a; }
+  .result-oshi { background: rgba(240,220,255,0.2); border-radius: 14px; padding: 20px; margin-bottom: 28px; border: 1px solid rgba(192,132,252,0.2); text-align: left; }
+  .result-oshi-label { font-size: 11px; letter-spacing: 2px; color: #b47ad4; margin-bottom: 8px; }
+  .result-oshi-text { font-size: 14px; line-height: 1.8; color: #7b7294; }
+  .retry-btn { background: linear-gradient(135deg, rgba(232,180,232,0.2), rgba(180,212,232,0.2)); border: 1px solid rgba(192,132,252,0.3); border-radius: 14px; padding: 16px 36px; color: #7a5a9a; font-family: 'Zen Maru Gothic', sans-serif; font-size: 14px; cursor: pointer; letter-spacing: 2px; transition: all 0.3s ease; width: 100%; margin-top: 16px; }
+  .retry-btn:hover { background: linear-gradient(135deg, rgba(232,180,232,0.35), rgba(180,212,232,0.35)); transform: translateY(-2px); }
+
+  @keyframes fadeDown  { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes fadeIn    { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes slideUp   { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes fadeInUp  { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+`;
+
+const questions = [
+  { text: "夜、ひとりでいるとき、自然と何をしていることが多い？", choices: [
+    { icon: "🎵", text: "音楽を聴きながら、ぼーっとしている", scores: { lavender: 2, skyblue: 1 } },
+    { icon: "📖", text: "本や漫画を読んでいる", scores: { ivory: 2, mint: 1 } },
+    { icon: "✨", text: "推しのことを考えて妄想している", scores: { rose: 2, lavender: 1 } },
+    { icon: "📱", text: "SNSで好きなものを集めている", scores: { skyblue: 2, mint: 1 } },
+  ]},
+  { text: "推しを見ているとき、胸の中に来るのはどんな感覚？", choices: [
+    { icon: "🌸", text: "あたたかくて、泣きそうになる", scores: { rose: 2, ivory: 1 } },
+    { icon: "⚡", text: "興奮して、全力で応援したくなる", scores: { mint: 2, skyblue: 1 } },
+    { icon: "🌙", text: "静かに、でも確かに満たされる", scores: { lavender: 2, ivory: 1 } },
+    { icon: "💫", text: "自分も輝けるような気がしてくる", scores: { skyblue: 2, rose: 1 } },
+  ]},
+  { text: "選ぶとしたら、どんな空間が好き？", choices: [
+    { icon: "🕯️", text: "間接照明のやわらかい、静かな部屋", scores: { lavender: 2, ivory: 1 } },
+    { icon: "🌿", text: "植物があって、光が差し込む場所", scores: { mint: 2, ivory: 1 } },
+    { icon: "🌆", text: "夜景が見える、少し非日常な場所", scores: { skyblue: 2, lavender: 1 } },
+    { icon: "🌸", text: "花や好きなものに囲まれた、自分だけの空間", scores: { rose: 2, mint: 1 } },
+  ]},
+  { text: "推しへの気持ちを一言で表すなら？", choices: [
+    { icon: "💜", text: "「いてくれるだけでいい」", scores: { lavender: 3 } },
+    { icon: "💙", text: "「どこまでも追いかけたい」", scores: { skyblue: 3 } },
+    { icon: "💚", text: "「一緒に成長していきたい」", scores: { mint: 3 } },
+    { icon: "🌸", text: "「ずっとそばにいたい」", scores: { rose: 3 } },
+    { icon: "🤍", text: "「その存在が私の宝物」", scores: { ivory: 3 } },
+  ]},
+  { text: "落ち込んだとき、あなたを救ってくれるのは？", choices: [
+    { icon: "🎤", text: "推しの歌声や言葉", scores: { rose: 2, lavender: 1 } },
+    { icon: "🎬", text: "推しの映像を繰り返し見ること", scores: { skyblue: 2, mint: 1 } },
+    { icon: "✍️", text: "気持ちを書き出したり、絵を描くこと", scores: { ivory: 2, lavender: 1 } },
+    { icon: "👥", text: "同じ推しを持つ友達と話すこと", scores: { mint: 2, skyblue: 1 } },
+  ]},
+  { text: "推しに会えるとしたら、何を伝えたい？", choices: [
+    { icon: "🙏", text: "「ありがとう、あなたのおかげで生きられた」", scores: { ivory: 2, lavender: 1 } },
+    { icon: "💌", text: "「大好きです、ずっと応援しています」", scores: { rose: 2, ivory: 1 } },
+    { icon: "🌟", text: "「あなたの夢を、私も信じている」", scores: { mint: 2, skyblue: 1 } },
+    { icon: "😊", text: "「笑顔でいてくれてありがとう」", scores: { skyblue: 2, rose: 1 } },
+  ]},
+  { text: "あなたにとって「推す」とはどういうこと？", choices: [
+    { icon: "🕊️", text: "存在するだけで世界が美しくなること", scores: { lavender: 2, ivory: 1 } },
+    { icon: "🔥", text: "毎日に熱と理由を与えてくれること", scores: { mint: 2, skyblue: 1 } },
+    { icon: "💎", text: "他の何にも変えられない宝物を持つこと", scores: { ivory: 2, rose: 1 } },
+    { icon: "🌈", text: "自分の感情が全部肯定される感覚", scores: { rose: 2, lavender: 1 } },
+  ]},
+];
+
+const results = {
+  lavender: { name: "ラベンダー", sub: "Lavender / 幻夢の紫", color: "#c4a0e8", gradient: "linear-gradient(135deg, #c4a0e8, #9b72cf)", desc: "あなたの推し色は「ラベンダー」。静かに深く、誰よりも純粋に愛せる人。感情は内側で輝いていて、言葉にならない愛情を持っています。推しの存在を、まるで夢の中の光のように大切にしている。その優しさは、推しにとってもきっと特別な温度を持っています。", tags: ["静かな愛情家", "深く感じる人", "繊細な魂", "夢を見る人"], oshi: "「あなたがいるから、この世界は美しい」と、心の中でいつも思っているはず。言葉にしなくても、その想いはきっと届いています。" },
+  skyblue:  { name: "スカイブルー", sub: "Sky Blue / 蒼穹の青", color: "#6ab8e8", gradient: "linear-gradient(135deg, #6ab8e8, #3a8fc4)", desc: "あなたの推し色は「スカイブルー」。どこまでも追いかけ続ける、エネルギーと純粋さを持った推し活の体現者。推しの成長を誰よりも信じて、全力で応援できる力があります。その熱量は本物で、推しの背中を押す風になっています。", tags: ["全力応援タイプ", "追いかける勇気", "エネルギッシュ", "ブレない信念"], oshi: "あなたが掲げるペンライトの光は、どんな大きな会場でも届いている。推しはきっとその光を知っています。" },
+  mint:     { name: "ミントグリーン", sub: "Mint Green / 清新の緑", color: "#7cd4b4", gradient: "linear-gradient(135deg, #7cd4b4, #4aad8a)", desc: "あなたの推し色は「ミントグリーン」。推しと一緒に成長していきたい、前向きで清らかな愛を持つ人。推しの挑戦を自分のことのように喜び、失敗さえも「一緒に乗り越えよう」と思える強さがあります。その愛は清潔で、嫌味がなく、推しを本当の意味で支えられる色。", tags: ["共に歩む人", "前向きな愛情", "清らかさ", "成長を喜ぶ"], oshi: "推しが新しいことに挑戦するたびに、あなたは誰よりも「できる」と信じていた。その信頼が、推しを動かしています。" },
+  rose:     { name: "ローズピンク", sub: "Rose Pink / 恋情の薔薇", color: "#e87898", gradient: "linear-gradient(135deg, #e87898, #c4506c)", desc: "あなたの推し色は「ローズピンク」。感情豊かに、全身で愛せる情熱の人。推しへの気持ちが溢れて止まらない、その感情の豊かさがあなたの最大の魅力。泣いて笑って、全部本物。その真っ直ぐな愛情は、推しにとって太陽のような存在です。", tags: ["情熱的な愛情家", "感情豊か", "全力で愛する", "素直な心"], oshi: "あなたの笑顔と涙は、推しへの最高の贈り物。感情を隠さないで。その真っ直ぐさが、推しを幸せにしています。" },
+  ivory:    { name: "アイボリー", sub: "Ivory / 永遠の白磁", color: "#e8dfc4", gradient: "linear-gradient(135deg, #e8dfc4, #c8b890)", desc: "あなたの推し色は「アイボリー」。流行に左右されず、ずっとそこにいる。永遠の忠誠を誓うような、深くて静かな愛の持ち主。推しのすべてを「宝物」として大切にして、その存在の価値を誰よりも分かっている人。時間が経っても変わらない愛情は、本物の証。", tags: ["永遠の推し活", "ブレない愛", "深い理解者", "宝物にする人"], oshi: "デビューの頃から今まで、ずっと変わらない目で見てくれているあなた。推しにとって、あなたは特別な存在です。" },
+};
+
+// ★ ここを変更してください
+const FORMSPREE_URL = "https://formspree.io/f/あなたのID";
+const LINE_URL = "https://lin.ee/あなたのURL";
+
+export default function App() {
+  const [screen, setScreen] = useState("start"); // start | quiz | capture | result
+  const [currentQ, setCurrentQ] = useState(0);
+  const [scores, setScores] = useState({ lavender: 0, skyblue: 0, mint: 0, rose: 0, ivory: 0 });
+  const [currentResult, setCurrentResult] = useState(null);
+  const [captureStep, setCaptureStep] = useState("mail"); // mail | line | complete
+  const [mailInput, setMailInput] = useState("");
+  const [mailSending, setMailSending] = useState(false);
+  const [mailSent, setMailSent] = useState(false);
+
+  const pct = Math.round((currentQ / questions.length) * 100);
+
+  const selectChoice = (scoreMap) => {
+    const newScores = { ...scores };
+    Object.entries(scoreMap).forEach(([k, v]) => { newScores[k] = (newScores[k] || 0) + v; });
+    const next = currentQ + 1;
+    if (next < questions.length) {
+      setScores(newScores);
+      setCurrentQ(next);
+    } else {
+      const top = Object.entries(newScores).sort((a, b) => b[1] - a[1])[0][0];
+      setScores(newScores);
+      setCurrentResult(results[top]);
+      setScreen("capture");
+    }
+  };
+
+  const submitMail = async () => {
+    setMailSending(true);
+    try {
+      const res = await fetch(FORMSPREE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: mailInput,
+          subject: `【推し色占い】あなたの推し色は「${currentResult.name}」`,
+          message: `▶ ${currentResult.name}（${currentResult.sub}）\n\n${currentResult.desc}\n\n✦ 推しへのメッセージ\n${currentResult.oshi}`,
+        }),
+      });
+      if (res.ok) {
+        setMailSent(true);
+        setCaptureStep("line");
+      } else {
+        alert("送信に失敗しました。もう一度お試しください。");
+      }
+    } catch {
+      alert("通信エラーが発生しました。");
+    }
+    setMailSending(false);
+  };
+
+  const openLine = () => {
+    window.open(LINE_URL, "_blank");
+    setCaptureStep("complete");
+  };
+
+  const skipLine = () => setCaptureStep("complete");
+
+  const resetQuiz = () => {
+    setScreen("start");
+    setCurrentQ(0);
+    setScores({ lavender: 0, skyblue: 0, mint: 0, rose: 0, ivory: 0 });
+    setCurrentResult(null);
+    setCaptureStep("mail");
+    setMailInput("");
+    setMailSending(false);
+    setMailSent(false);
+  };
+
+  const isMailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mailInput);
+
+  return (
+    <>
+      <style>{styles}</style>
+
+      {/* 背景デコ */}
+      <div className="bg-deco">
+        <div className="petal">🌸</div>
+        <div className="petal">🌺</div>
+        <div className="petal">🌷</div>
+        <div className="petal">🌸</div>
+        <div className="petal">🌼</div>
+        <div className="petal">🌸</div>
+        <div className="petal">🌺</div>
+        <div className="petal">🌷</div>
+        <div className="butterfly">🦋</div>
+        <div className="butterfly">🦋</div>
+        <div className="butterfly">🦋</div>
+        <div className="butterfly">🦋</div>
+      </div>
+
+      <div className="oshi-container">
+
+        {/* ヘッダー */}
+        <div className="oshi-header">
+          <div className="sub">✦ Color Diagnosis ✦</div>
+          <h1>推し活💜推し色占い</h1>
+          <p className="desc">あなたの内側に宿る色が、<br />あなたにふさわしい推し色を教えてくれる。</p>
+        </div>
+
+        {/* ===== スタート画面 ===== */}
+        {screen === "start" && (
+          <div className="start-screen">
+            <div className="oshi-card">
+              <div className="start-visual">
+                <div className="orb"></div>
+                <div className="heart-wrap">
+                  <span className="sparkle">✨</span>
+                  <span className="sparkle">✨</span>
+                  <span className="sparkle">✨</span>
+                  <span className="sparkle">✨</span>
+                  <span className="sparkle">✨</span>
+                  <span className="sparkle">✨</span>
+                  <div className="heart-main">💜</div>
+                </div>
+              </div>
+              <p style={{ fontSize: "14px", lineHeight: "2.2", color: "#555555", marginBottom: "10px" }}>
+                7つの質問に答えるだけで、<br />
+                あなただけの「推し色」が見つかります。<br />
+                色には感情がある。<br />
+                あなたはどの色に選ばれるのでしょう。
+              </p>
+              <button className="start-btn" onClick={() => setScreen("quiz")}>診断スタート</button>
+              <p className="floating-note">全7問・約1分</p>
+            </div>
+          </div>
+        )}
+
+        {/* ===== 質問画面 ===== */}
+        {screen === "quiz" && (
+          <div>
+            <div className="progress-wrap">
+              <div className="progress-label">
+                <span>Q{currentQ + 1} / {questions.length}</span>
+                <span>{pct}%</span>
+              </div>
+              <div className="progress-bar">
+                <div className="progress-fill" style={{ width: `${pct}%` }}></div>
+              </div>
+            </div>
+            <div className="oshi-card">
+              <div className="question-num">QUESTION {String(currentQ + 1).padStart(2, "0")}</div>
+              <div className="question-text">{questions[currentQ].text}</div>
+              <div className="choices">
+                {questions[currentQ].choices.map((c, i) => (
+                  <button key={i} className="choice-btn" onClick={() => selectChoice(c.scores)}>
+                    <span className="choice-icon">{c.icon}</span>
+                    <span>{c.text}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ===== 診断完了・登録画面 ===== */}
+        {screen === "capture" && currentResult && (
+          <div className="capture-card">
+            <div className="result-preview">
+              <div className="result-preview-color" style={{ background: currentResult.gradient, boxShadow: `0 0 30px ${currentResult.color}80` }}></div>
+              <div className="result-preview-label">YOUR OSHI COLOR</div>
+              <div className="result-preview-name">{currentResult.name}</div>
+            </div>
+            <div className="result-teaser">
+              <div className="result-teaser-text">✦ あなたの推し色が見つかりました！</div>
+              <div className="result-teaser-blur">あなたは〇〇なタイプ。推しへの想いは誰よりも深く...</div>
+            </div>
+            <div className="capture-divider"></div>
+            <div className="capture-title">結果を受け取る💜</div>
+            <div className="capture-subtitle">メールアドレスを登録すると、<br />あなただけの推し色診断結果が届きます。</div>
+
+            <div className="steps">
+              <div className={`step ${captureStep === "mail" ? "active" : "done"}`}>
+                <div className="step-num">{captureStep === "mail" ? "1" : "✓"}</div>
+                <span>メール登録</span>
+              </div>
+              <div className="step-arrow">›</div>
+              <div className={`step ${captureStep === "line" ? "active" : captureStep === "complete" ? "done" : ""}`}>
+                <div className="step-num">{captureStep === "complete" ? "✓" : "2"}</div>
+                <span>LINE登録</span>
+              </div>
+              <div className="step-arrow">›</div>
+              <div className={`step ${captureStep === "complete" ? "active" : ""}`}>
+                <div className="step-num">3</div>
+                <span>結果を見る</span>
+              </div>
+            </div>
+
+            {/* STEP1: メール */}
+            {captureStep === "mail" && (
+              <div className="mail-section">
+                <div className="mail-section-label">
+                  ✉️ メールアドレス
+                  <span className="mail-required-badge">必須</span>
+                </div>
+                <div className="mail-input-row">
+                  <input
+                    className="delivery-input"
+                    type="email"
+                    placeholder="メールアドレスを入力"
+                    value={mailInput}
+                    onChange={(e) => setMailInput(e.target.value)}
+                  />
+                </div>
+                <button
+                  className="mail-submit-btn"
+                  onClick={submitMail}
+                  disabled={!isMailValid || mailSending}
+                >
+                  {mailSending ? "送信中…" : "メールで結果を受け取る ›"}
+                </button>
+                <p className="delivery-note">※ 入力したアドレスに診断結果をお送りします。<br />迷惑メールフォルダもご確認ください。</p>
+              </div>
+            )}
+
+            {/* STEP2: LINE */}
+            {captureStep === "line" && (
+              <div>
+                {mailSent && (
+                  <div className="mail-success-inline">✓ 送信しました！次はLINE登録へ</div>
+                )}
+                <div style={{ marginBottom: "14px", background: "rgba(6,199,85,0.06)", border: "1px solid rgba(6,199,85,0.15)", borderRadius: "12px", padding: "14px 16px", textAlign: "left", fontSize: "13px", color: "#4a7a5a", lineHeight: "1.7" }}>
+                  🎁 LINE登録で<strong>推し色に合わせたメッセージ</strong>が届きます。<br />
+                  推し活のヒントや限定コンテンツも配信予定✨
+                </div>
+                <button className="line-result-btn" onClick={openLine}>
+                  <span className="line-icon">L</span>
+                  LINEでさらに詳しく受け取る
+                </button>
+                <button className="skip-btn" onClick={skipLine}>LINEは登録せず結果を見る</button>
+              </div>
+            )}
+
+            {/* STEP3: 完了 */}
+            {captureStep === "complete" && (
+              <div className="complete-section">
+                <div className="complete-icon">🎉</div>
+                <div className="complete-title">登録完了！</div>
+                <div className="complete-text">メールをご確認ください💌<br />あなたの推し色診断結果が届いています。</div>
+                <button className="mail-submit-btn" onClick={() => setScreen("result")}>結果を今すぐ見る ›</button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ===== 結果画面 ===== */}
+        {screen === "result" && currentResult && (
+          <div className="result-card">
+            <div className="result-label">YOUR OSHI COLOR</div>
+            <div
+              className="result-color-display"
+              style={{ background: currentResult.gradient, boxShadow: `0 0 40px ${currentResult.color}80` }}
+            ></div>
+            <div
+              className="result-color-name"
+              style={{ background: currentResult.gradient, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}
+            >
+              {currentResult.name}
+            </div>
+            <div className="result-color-sub">{currentResult.sub}</div>
+            <div className="result-divider"></div>
+            <div className="result-desc">{currentResult.desc}</div>
+            <div className="result-tags">
+              {currentResult.tags.map((t, i) => <span key={i} className="tag">{t}</span>)}
+            </div>
+            <div className="result-oshi">
+              <div className="result-oshi-label">✦ あなたの推しへのメッセージ</div>
+              <div className="result-oshi-text">{currentResult.oshi}</div>
+            </div>
+            <button className="retry-btn" onClick={resetQuiz}>もう一度占う</button>
+          </div>
+        )}
+
+      </div>
+    </>
+  );
+}
   --gold-light:  #e8c96a;
   --gold-glow:   rgba(201,168,76,0.25);
   --ocean:       #6aaccc;
