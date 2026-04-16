@@ -61,7 +61,7 @@ function getLineQrSrc() {
  * 診断で確定した色を URL に埋めて LINE 側へ渡す。
  * localStorage 依存ではなく type クエリ優先で着地を固定する。
  */
-function buildLineResultUrl(typeKey, mode = "full") {
+
   const normalizedType = normalizeTypeKey(typeKey);
   if (!normalizedType) return "";
   const prefix = (publicUrl || "").replace(/\/$/, "");
