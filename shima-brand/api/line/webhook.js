@@ -166,12 +166,12 @@ const COLOR_MESSAGES = {
 };
 
 function detectColor(t) {
-  const lower = t.toLowerCase();
-  if (lower.includes("mint") || t.includes("ミント")) return "mint";
-  if (lower.includes("rose") || t.includes("ローズ")) return "rose";
-  if (lower.includes("lavender") || t.includes("ラベンダー")) return "lavender";
-  if (lower.includes("ivory") || t.includes("アイボリー")) return "ivory";
-  if (lower.includes("skyblue") || t.includes("スカイブルー") || lower.includes("sky")) return "skyblue";
+  const lower = t.toLowerCase().trim();
+  if (lower === "color=mint" || lower.includes("mint") || t.includes("ミント")) return "mint";
+  if (lower === "color=rose" || lower.includes("rose") || t.includes("ローズ")) return "rose";
+  if (lower === "color=lavender" || lower.includes("lavender") || t.includes("ラベンダー")) return "lavender";
+  if (lower === "color=ivory" || lower.includes("ivory") || t.includes("アイボリー")) return "ivory";
+  if (lower === "color=skyblue" || lower.includes("skyblue") || t.includes("スカイブルー")) return "skyblue";
   return null;
 }
 

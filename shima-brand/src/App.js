@@ -6,7 +6,7 @@ const VIDEO = {
   final: `${publicUrl}/videos/C_Oshiiro_Thank_you_and_invite_1080p.mp4`
 };
 const LINE_OFFICIAL_URL = "https://line.me/R/ti/p/@877xrsvw";
-const LINE_OA_ID = process.env.REACT_APP_LINE_OA_ID || "@877xrsvw";
+const LINE_OA_ID = process.env.REACT_APP_LINE_OA_ID || "@2009786397";
 
 const RESULT_TYPE_KEYS = ["mint", "rose", "lavender", "ivory", "skyblue"];
 const REACT_APP_LIFF_ID = process.env.REACT_APP_LIFF_ID || "";
@@ -1417,7 +1417,7 @@ export default function App() {
   };
 
   const renderOshiResultCard = (res, isFull, typeKey) => {
-    const lineOaMessageUrl = `https://line.me/R/oaMessage/${encodeURIComponent(LINE_OA_ID)}/?text=${encodeURIComponent(res.name)}`;
+    const lineOaMessageUrl = `https://line.me/R/oaMessage/${encodeURIComponent(LINE_OA_ID)}/?text=${encodeURIComponent("color=" + typeKey)}`;
     const renderLineSendBtn = () => (
       <div className="result-base-cta-wrap">
         <a
