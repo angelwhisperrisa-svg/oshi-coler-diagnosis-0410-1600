@@ -1189,15 +1189,10 @@ export default function App() {
 
   useLayoutEffect(() => {
     if (deepLinkConsumedRef.current) return;
+    deepLinkConsumedRef.current = true; // 先に確定させ、再侵入を完全に防ぐ
+
     const p = pendingDeepLinkRef.current;
-    if (p.autoMissingStorage) {
-      deepLinkConsumedRef.current = true;
-      shouldSendLinePushRef.current = false;
-      setScreen("start");
-      return;
-    }
     if (p.showResult && p.resultType) {
-      deepLinkConsumedRef.current = true;
       shouldSendLinePushRef.current = false;
       setResultKey(p.resultType);
       setResultModeFull(Boolean(p.modeFull));
@@ -1210,6 +1205,7 @@ export default function App() {
         window.history.replaceState({}, "", path);
       }
     }
+    // autoMissingStorage による setScreen("start") は削除（初期化処理の再侵入防止）
   }, []);
 
   useEffect(() => {
@@ -1310,7 +1306,7 @@ export default function App() {
     setScreen("quiz");
     setCurrentQ(0);
     setScores(initialScores);
-    setResultKey("");
+    // setResultKey("") は削除：resultKey クリアによる useEffect 再発火・sessionStorage 破壊を防ぐ
   };
 
   const selectChoice = (scoreMap) => {
@@ -1368,10 +1364,16 @@ export default function App() {
     let cancelled = false;
     (async () => {
       try {
+        // init前にUAでLINEブラウザを判定（init不要・リダイレクト防止）
+        if (!isLikelyLineInAppBrowser()) return;
+
         const liff = (await import("@line/liff")).default;
-        await liff.init({ liffId: REACT_APP_LIFF_ID, withLoginOnExternalBrowser: false });
+        await liff.init({
+          liffId: REACT_APP_LIFF_ID,
+          withLoginOnExternalBrowser: false
+        });
+
         if (cancelled) return;
-        // sendMessages は LINE クライアント内でのみ動作する
         if (!liff.isInClient()) return;
 
         const resData = results[resultKey];
