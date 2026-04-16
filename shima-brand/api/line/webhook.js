@@ -210,7 +210,9 @@ export default async function handler(req, res) {
   for (const event of events) {
     if (event.type === "message" && event.message.type === "text") {
       const text = event.message.text;
+      console.log("[webhook] received text:", text);
       const colorKey = detectColor(text);
+      console.log("[webhook] detected colorKey:", colorKey);
 
       if (colorKey && COLOR_MESSAGES[colorKey]) {
         await replyMessage(event.replyToken, COLOR_MESSAGES[colorKey]);
