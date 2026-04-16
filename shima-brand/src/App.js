@@ -1390,13 +1390,11 @@ export default function App() {
 
     const liff = liffRef.current;
     const resData = results[resultKey];
-    const diagnosisText = `${resData.teaserFree}\n\n${resData.hookBeforeLock}`;
-    const base = (publicUrl || "").replace(/\/$/, "");
-    const resultUrl = `${window.location.origin}${base}/result?type=${encodeURIComponent(resultKey)}&mode=free`;
+    const colorName = resData.name || resultKey;
 
     liff.sendMessages([{
       type: "text",
-      text: `${diagnosisText}\n\n🔗 結果を見る：${resultUrl}`
+      text: colorName
     }]).then(() => {
       linePushSentRef.current = true;
     }).catch((e) => {
