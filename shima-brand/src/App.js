@@ -1351,7 +1351,7 @@ export default function App() {
       try {
         const liff = (await import("@line/liff")).default;
         console.log("[liff] init start, liffId:", REACT_APP_LIFF_ID);
-        await liff.init({ liffId: REACT_APP_LIFF_ID, withLoginOnExternalBrowser: true });
+        await liff.init({ liffId: REACT_APP_LIFF_ID, withLoginOnExternalBrowser: false });
         if (cancelled) return;
 
         const inClient = liff.isInClient();
