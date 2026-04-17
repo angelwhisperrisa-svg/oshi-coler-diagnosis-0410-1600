@@ -14,8 +14,6 @@ const LINE_BRAND = "薫凛香房 公式LINE";
 
 /** 診断タイプ保持（リッチメニュー等の /result?auto=true から分岐するため） */
 const OSHI_RESULT_STORAGE_KEY = "shima_oshi_result_v1";
-/** LIFFログイン遷移後に自動送信を再開するための一時キー */
-const PENDING_LINE_DELIVERY_KEY = "shima_pending_line_delivery_v1";
 
 function readStoredOshiType() {
   try {
@@ -53,36 +51,6 @@ function clearStoredOshiType() {
   }
 }
 
-function readPendingLineDeliveryType() {
-  try {
-    if (typeof window === "undefined") return null;
-    const raw = window.localStorage.getItem(PENDING_LINE_DELIVERY_KEY);
-    if (raw && RESULT_TYPE_KEYS.includes(raw)) return raw;
-  } catch (_) {
-    /* ignore */
-  }
-  return null;
-}
-
-function writePendingLineDeliveryType(typeKey) {
-  try {
-    if (typeof window === "undefined") return;
-    if (!typeKey || !RESULT_TYPE_KEYS.includes(typeKey)) return;
-    window.localStorage.setItem(PENDING_LINE_DELIVERY_KEY, typeKey);
-  } catch (_) {
-    /* ignore */
-  }
-}
-
-function clearPendingLineDeliveryType() {
-  try {
-    if (typeof window === "undefined") return;
-    window.localStorage.removeItem(PENDING_LINE_DELIVERY_KEY);
-  } catch (_) {
-    /* ignore */
-  }
-}
-
 function getLineQrSrc() {
   const custom = process.env.REACT_APP_LINE_QR_IMAGE_URL;
   if (custom) return custom;
@@ -111,21 +79,6 @@ function getBaseShopUrlForType(typeKey) {
   if (typeKey === "ivory") return process.env.REACT_APP_BASE_IVORY || fallback;
   if (typeKey === "skyblue") return process.env.REACT_APP_BASE_SKYBLUE || fallback;
   return fallback;
-}
-
-/**
- * リッチメニュー等で開いても `liff.isInClient()` が false になる端末がある。
- * User-Agent で LINE 内蔵ブラウザを拾い、ログイン・友だち確認フローに進める。
- */
-function isLikelyLineInAppBrowser() {
-  if (typeof navigator === "undefined") return false;
-  const ua = navigator.userAgent || "";
-  return (
-    /Line\//i.test(ua) ||
-    /; line\//i.test(ua) ||
-    /liff/i.test(ua) ||
-    /\bLINE\b/.test(ua)
-  );
 }
 
 function parseInitialResultRoute() {
@@ -1215,7 +1168,6 @@ export default function App() {
   const welcomeExitTimerRef = useRef(null);
   const welcomeSilentSkipTimerRef = useRef(null);
   const welcomeEngagedRef = useRef(false);
-  const linePushSentRef = useRef(false);
   const liffMsgSentRef = useRef(false);
 
   const progress = Math.round((currentQ / questions.length) * 100);
@@ -1235,7 +1187,7 @@ export default function App() {
     }
     if (p.showResult && p.resultType) {
       deepLinkConsumedRef.current = true;
-      shouldSendLinePushRef.current = readPendingLineDeliveryType() === p.resultType;
+      shouldSendLinePushRef.current = false;
       setResultKey(p.resultType);
       setResultModeFull(Boolean(p.modeFull));
       setScreen("result");
@@ -1362,18 +1314,15 @@ export default function App() {
     setResultKey(topResultKey);
     setResultModeFull(false);
     shouldSendLinePushRef.current = true;
-    writePendingLineDeliveryType(topResultKey);
     shouldSyncQuizResultUrlRef.current = true;
     setScreen("calculating");
   };
 
   const resetDiagnosis = () => {
-    linePushSentRef.current = false;
     liffMsgSentRef.current = false;
     shouldSendLinePushRef.current = false;
     shouldSyncQuizResultUrlRef.current = false;
     clearStoredOshiType();
-    clearPendingLineDeliveryType();
     if (typeof window !== "undefined") {
       const path = (window.location.pathname || "").replace(/\/$/, "") || "/";
       if (path === "/result" || path.endsWith("/result")) {
@@ -1406,9 +1355,8 @@ export default function App() {
         if (cancelled) return;
 
         const inClient = liff.isInClient();
-        const loggedIn = liff.isLoggedIn();
         console.log("[liff] isInClient immediately after init:", inClient);
-        console.log("[liff] isInClient:", inClient, "isLoggedIn:", loggedIn, "resultKey:", resultKey);
+        console.log("[liff] isInClient:", inClient, "resultKey:", resultKey);
 
         // --- liff.sendMessages: 診断完了直後に送信を試行 ---
         console.log(
@@ -1417,14 +1365,12 @@ export default function App() {
           "shouldSend=", shouldSendLinePushRef.current,
           "alreadySent=", liffMsgSentRef.current
         );
-        if (shouldSendLinePushRef.current && !liffMsgSentRef.current) {
-          if (!inClient) {
-            console.warn("[liff.sendMessages] trying send even though isInClient=false");
-          }
+        if (inClient && shouldSendLinePushRef.current && !liffMsgSentRef.current) {
           try {
             await liff.sendMessages([{ type: "text", text: "color=" + resultKey }]);
             console.log("[liff.sendMessages] sent: color=" + resultKey);
             liffMsgSentRef.current = true;
+            shouldSendLinePushRef.current = false;
           } catch (e) {
             console.warn("[liff.sendMessages] error:", String(e));
           }
@@ -1436,51 +1382,13 @@ export default function App() {
             "alreadySent=", liffMsgSentRef.current
           );
         }
-
-        // --- push-result: 診断完了時の本送信（成功まで優先） ---
-        if (!linePushSentRef.current && shouldSendLinePushRef.current) {
-          const inLineUi = inClient || isLikelyLineInAppBrowser();
-          console.log("[line.push-result] precheck", "inLineUi=", inLineUi, "loggedIn=", loggedIn);
-          if (!loggedIn) {
-            console.warn("[line.push-result] user not logged in, redirecting to liff.login");
-            if (typeof liff.login === "function") {
-              liff.login({ redirectUri: window.location.href });
-            }
-            return;
-          }
-
-          const idToken = liff.getIDToken();
-          if (!idToken) {
-            console.warn("[line.push-result] missing idToken after login");
-            return;
-          }
-
-          shouldSendLinePushRef.current = false;
-          const resData = results[resultKey];
-          const diagnosisText = resultModeFull
-            ? resData.fullBody
-            : `${resData.teaserFree}\n\n${resData.hookBeforeLock}`;
-          const res = await fetch(`${window.location.origin}/api/line/push-result`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ idToken, resultType: resultKey, diagnosisText })
-          });
-          if (res.ok) {
-            linePushSentRef.current = true;
-            clearPendingLineDeliveryType();
-          } else {
-            const detail = await res.text();
-            console.warn("[line.push-result] failed:", res.status, detail.slice(0, 300));
-            shouldSendLinePushRef.current = true;
-          }
-        }
       } catch (e) {
         console.warn("[liff] error:", String(e));
       }
     })();
 
     return () => { cancelled = true; };
-  }, [screen, resultKey, resultModeFull]);
+  }, [screen, resultKey]);
 
   const lineQrSrc = getLineQrSrc();
   const renderLineAcquisitionBlock = (typeKey) => {
