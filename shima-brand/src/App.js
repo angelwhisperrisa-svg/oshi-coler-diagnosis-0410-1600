@@ -660,6 +660,9 @@ const styles = `
     box-sizing: border-box;
   }
   .floating-note { margin-top: 2px; color: #999; font-size: 12px; }
+  .start-screen .start-btn + .start-btn {
+    margin-top: 12px;
+  }
 
   .progress-wrap { margin-bottom: 14px; }
   .progress-label {
@@ -1483,6 +1486,24 @@ export default function App() {
     }, WELCOME_MUTED_END_DELAY_MS);
   };
 
+  const startQuiz = () => {
+    setLiffCompleteError("");
+    setLiffSaveLoading(false);
+    liffSaveInFlightRef.current = false;
+    try {
+      if (typeof window !== "undefined") window.sessionStorage.removeItem(PENDING_LINE_SEND_KEY);
+    } catch (_) {
+      /* ignore */
+    }
+    shouldSendLinePushRef.current = false;
+    liffMsgSentRef.current = false;
+    resultKeyRef.current = "";
+    setScreen("quiz");
+    setCurrentQ(0);
+    setScores(initialScores);
+    setResultKey("");
+  };
+
   const selectChoice = (scoreMap) => {
     const nextScores = { ...scores };
     Object.entries(scoreMap).forEach(([k, v]) => { nextScores[k] += v; });
@@ -1808,6 +1829,7 @@ export default function App() {
                 7つの質問で、あなただけの「推し色」が見つかる。色には感情がある。あなたはどの色に選ばれるのでしょう。
               </p>
               <a className="start-btn" href={LINE_OFFICIAL_URL} target="_blank" rel="noopener noreferrer">LINE登録して診断を始める✨</a>
+              <button type="button" className="start-btn" onClick={startQuiz}>LINE登録後はこちらから診断を始める</button>
               <div className="floating-note">全7問・約1分</div>
             </section>
           )}
