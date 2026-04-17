@@ -1267,6 +1267,8 @@ const styles = `
     box-shadow: 0 12px 32px rgba(6, 199, 85, 0.38);
     transition: transform 0.18s ease;
     line-height: 1.35;
+    text-decoration: none;
+    box-sizing: border-box;
   }
   .result-line-next-btn:active {
     transform: scale(0.98);
@@ -1537,20 +1539,24 @@ export default function App() {
 
 をLINEでお届けします✨`;
 
-  /** handleComplete はこのハンドラ（＝「LINEで続きを受け取る🩷」の onClick）からのみ呼ぶ。結果画面表示だけでは送信しない。 */
-  const handleLineContinueAfterResult = async () => {
+  /**
+   * 「LINEで続きを受け取る🩷」: 必ず先に handleComplete（/api/save-result）→ 成功後に LINE 公式へ遷移。
+   * handleComplete はこのハンドラからのみ呼ぶ。結果画面表示だけでは送信しない。
+   */
+  const handleLineContinueAfterResult = async (e) => {
+    if (e && typeof e.preventDefault === "function") e.preventDefault();
     if (typeof window === "undefined") return;
     if (screen !== "result") return;
     const confirmedResultKey = resultKeyRef.current || resultKey;
     if (!confirmedResultKey) return;
-    if (!REACT_APP_LIFF_ID) {
+    if (liffSaveLoading || liffSaveInFlightRef.current) return;
+
+    if (liffMsgSentRef.current) {
       window.location.assign(LINE_OFFICIAL_URL);
       return;
     }
-    if (liffMsgSentRef.current) return;
-    if (liffSaveInFlightRef.current) return;
-    liffSaveInFlightRef.current = true;
 
+    liffSaveInFlightRef.current = true;
     setLiffCompleteError("");
     setLiffSaveLoading(true);
     let sent = false;
@@ -1565,8 +1571,8 @@ export default function App() {
       } else if (out.message) {
         setLiffCompleteError(out.message);
       }
-    } catch (e) {
-      console.warn("[handleComplete] error:", String(e));
+    } catch (err) {
+      console.warn("[handleComplete] error:", String(err));
       setLiffCompleteError("送信処理でエラーが発生しました。もう一度ボタンからお試しください。");
     } finally {
       liffSaveInFlightRef.current = false;
@@ -1575,15 +1581,17 @@ export default function App() {
 
     if (!sent) return;
 
-    try {
-      const liff = (await import("@line/liff")).default;
-      await liff.init({ liffId: REACT_APP_LIFF_ID, withLoginOnExternalBrowser: false });
-      if (liff.isInClient() && typeof liff.closeWindow === "function") {
-        liff.closeWindow();
-        return;
+    if (REACT_APP_LIFF_ID) {
+      try {
+        const liff = (await import("@line/liff")).default;
+        await liff.init({ liffId: REACT_APP_LIFF_ID, withLoginOnExternalBrowser: false });
+        if (liff.isInClient() && typeof liff.closeWindow === "function") {
+          liff.closeWindow();
+          return;
+        }
+      } catch (err) {
+        console.warn("[handleLineContinueAfterResult]", err);
       }
-    } catch (e) {
-      console.warn("[handleLineContinueAfterResult]", e);
     }
     window.location.assign(LINE_OFFICIAL_URL);
   };
@@ -1591,14 +1599,15 @@ export default function App() {
   const renderLineContinueBlock = () => (
     <div className="result-line-next-wrap">
       <p className="result-line-next-copy">{RESULT_LINE_NEXT_COPY}</p>
-      <button
-        type="button"
+      <a
+        href={LINE_OFFICIAL_URL}
+        role="button"
         className="result-line-next-btn"
-        onClick={() => void handleLineContinueAfterResult()}
-        disabled={liffSaveLoading}
+        aria-disabled={liffSaveLoading}
+        onClick={(ev) => { void handleLineContinueAfterResult(ev); }}
       >
         LINEで続きを受け取る🩷
-      </button>
+      </a>
     </div>
   );
 
