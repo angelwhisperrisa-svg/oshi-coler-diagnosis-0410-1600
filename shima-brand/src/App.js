@@ -1346,6 +1346,7 @@ export default function App() {
   };
 
   useEffect(() => {
+    console.log("[DEBUG] useEffect fired");
     if (screen !== "result") return;
     const confirmedResultKey = resultKeyRef.current || resultKey;
     if (!confirmedResultKey) {
@@ -1378,6 +1379,7 @@ export default function App() {
           "alreadySent=", liffMsgSentRef.current
         );
         if (shouldSendLinePushRef.current && !liffMsgSentRef.current) {
+          console.log("[DEBUG] send trigger reached", { resultKey: confirmedResultKey, shouldSend: shouldSendLinePushRef.current, alreadySent: liffMsgSentRef.current });
           try {
             const idToken = liff.getIDToken();
             const accessToken = liff.getAccessToken();
