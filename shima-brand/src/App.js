@@ -12,6 +12,33 @@ const RESULT_TYPE_KEYS = ["mint", "rose", "lavender", "ivory", "skyblue"];
 const REACT_APP_LIFF_ID = process.env.REACT_APP_LIFF_ID || "";
 const LINE_BRAND = "薫凛香房 公式LINE";
 
+/** Instagram→LINE→LIFF 診断完了時: userId 取得後にサーバーへ保存し push させる */
+async function handleComplete(resultKey) {
+  if (!REACT_APP_LIFF_ID || !RESULT_TYPE_KEYS.includes(resultKey)) return false;
+  let userId = null;
+  try {
+    const liff = (await import("@line/liff")).default;
+    await liff.init({ liffId: REACT_APP_LIFF_ID, withLoginOnExternalBrowser: false });
+    if (liff.isLoggedIn()) {
+      const profile = await liff.getProfile();
+      userId = profile.userId;
+    }
+  } catch (e) {
+    console.log("LIFF取得失敗", e);
+  }
+  if (!userId) return false;
+  const res = await fetch(`${typeof window !== "undefined" ? window.location.origin : ""}/api/save-result`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId, resultKey })
+  });
+  if (!res.ok) {
+    console.warn("[handleComplete] save-result failed", await res.text());
+    return false;
+  }
+  return true;
+}
+
 /** 診断タイプ保持（リッチメニュー等の /result?auto=true から分岐するため） */
 const OSHI_RESULT_STORAGE_KEY = "shima_oshi_result_v1";
 
@@ -1360,78 +1387,29 @@ export default function App() {
 
     let cancelled = false;
     (async () => {
-      try {
-        const liff = (await import("@line/liff")).default;
-        console.log("[liff] init start, liffId:", REACT_APP_LIFF_ID);
-        await liff.init({ liffId: REACT_APP_LIFF_ID, withLoginOnExternalBrowser: false });
-        if (cancelled) return;
-
-        const inClient = liff.isInClient();
-        const loggedIn = liff.isLoggedIn();
-        console.log("[liff] isInClient immediately after init:", inClient);
-        console.log("[liff] isInClient:", inClient, "isLoggedIn:", loggedIn, "resultKey:", confirmedResultKey);
-
-        // --- server push: 診断完了直後にサーバー経由で送信 ---
-        console.log(
-          "[liff.pushResult] precheck",
-          "inClient=", inClient,
+      if (!shouldSendLinePushRef.current || liffMsgSentRef.current) {
+        console.warn(
+          "[handleComplete] skipped",
           "shouldSend=", shouldSendLinePushRef.current,
           "alreadySent=", liffMsgSentRef.current
         );
-        if (shouldSendLinePushRef.current && !liffMsgSentRef.current) {
-          console.log("[DEBUG] send trigger reached", { resultKey: confirmedResultKey, shouldSend: shouldSendLinePushRef.current, alreadySent: liffMsgSentRef.current });
-          try {
-            const idToken = liff.getIDToken();
-            const accessToken = liff.getAccessToken();
-            const lineUserId = liff.getContext()?.userId || "";
-            if (lineUserId) {
-              console.log("[DEBUG] lineUserId", lineUserId);
-            }
-            console.log("[LIFF DEBUG]", {
-              inClient: liff.isInClient(),
-              isLoggedIn: liff.isLoggedIn(),
-              hasIdToken: !!idToken,
-              hasAccessToken: !!accessToken,
-              hasLineUserId: !!lineUserId,
-              resultKey: confirmedResultKey
-            });
-
-            if (!lineUserId && !idToken && !accessToken) {
-              console.log("[DEBUG] skip send: no user identifier", {
-                lineUserId,
-                idToken,
-                accessToken
-              });
-              return;
-            }
-
-            console.log("[liff.pushResult] using server push");
-            const res = await fetch(`${window.location.origin}/api/line/push-result`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ lineUserId, idToken, accessToken, resultType: confirmedResultKey })
-            });
-            if (!res.ok) {
-              const detail = await res.text();
-              throw new Error(`push-result failed: ${res.status} ${detail}`);
-            }
-            console.log("[liff.pushResult] sent from server push:", confirmedResultKey);
-            console.log("[LIFF DEBUG] delivery route:", "server_push");
-            liffMsgSentRef.current = true;
-            shouldSendLinePushRef.current = false;
-          } catch (e) {
-            console.warn("[liff.pushResult] error:", String(e));
-          }
-        } else {
-          console.warn(
-            "[liff.pushResult] skipped",
-            "inClient=", inClient,
-            "shouldSend=", shouldSendLinePushRef.current,
-            "alreadySent=", liffMsgSentRef.current
-          );
+        return;
+      }
+      console.log("[DEBUG] send trigger reached", {
+        resultKey: confirmedResultKey,
+        shouldSend: shouldSendLinePushRef.current,
+        alreadySent: liffMsgSentRef.current
+      });
+      try {
+        const ok = await handleComplete(confirmedResultKey);
+        if (cancelled) return;
+        if (ok) {
+          liffMsgSentRef.current = true;
+          shouldSendLinePushRef.current = false;
+          console.log("[handleComplete] save-result ok", confirmedResultKey);
         }
       } catch (e) {
-        console.warn("[liff] error:", String(e));
+        console.warn("[handleComplete] error:", String(e));
       }
     })();
 
