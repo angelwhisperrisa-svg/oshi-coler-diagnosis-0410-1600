@@ -14,6 +14,8 @@ const LINE_BRAND = "薫凛香房 公式LINE";
 
 /** Instagram→LINE→LIFF 診断完了時: userId 取得後にサーバーへ保存し push させる */
 async function handleComplete(resultKey) {
+  console.log("[DEBUG] handleComplete start", resultKey);
+  console.log("[DEBUG] about to fetch", { resultKey });
   if (!REACT_APP_LIFF_ID || !RESULT_TYPE_KEYS.includes(resultKey)) return false;
   let userId = null;
   try {
@@ -155,6 +157,19 @@ function parseInitialResultRoute() {
     resultType: type,
     modeFull: mode === "full"
   };
+}
+
+/**
+ * LINE リッチメニュー / LIFF からの診断入口（女神画面を出さない）。
+ * 例: …/start または /?start=1 または /?entry=diagnosis
+ * Instagram 等のトップは / のまま（女神＝ゴール、診断へは進めない）
+ */
+function shouldSkipWelcomeToDiagnosis() {
+  if (typeof window === "undefined") return false;
+  const path = (window.location.pathname || "/").replace(/\/$/, "") || "/";
+  if (path === "/result" || path.endsWith("/result")) return false;
+  const q = new URLSearchParams(window.location.search);
+  return path === "/start" || q.get("start") === "1" || q.get("entry") === "diagnosis";
 }
 
 const questions = [
@@ -1020,6 +1035,47 @@ const styles = `
     transform: scale(0.98);
   }
 
+  .welcome-overlay--dual {
+    top: auto;
+    bottom: clamp(22px, 7vh, 52px);
+    transform: none;
+    padding: 0 22px;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .welcome-line-btn {
+    pointer-events: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: min(92vw, 360px);
+    min-height: 56px;
+    padding: 16px 28px;
+    border-radius: 999px;
+    font-family: inherit;
+    font-size: clamp(16px, 4.2vw, 18px);
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    color: #fff;
+    text-decoration: none;
+    background: #06C755;
+    box-shadow: 0 10px 32px rgba(6, 199, 85, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    animation: welcomeGlassIn 0.75s ease-out 0.15s both;
+  }
+
+  .welcome-line-btn:hover {
+    box-shadow: 0 14px 40px rgba(6, 199, 85, 0.5);
+  }
+
+  .welcome-line-btn:active {
+    transform: scale(0.98);
+  }
+
   @keyframes welcomeGlassIn {
     from { opacity: 0; transform: translateY(12px); }
     to { opacity: 1; transform: translateY(0); }
@@ -1214,12 +1270,16 @@ export default function App() {
   const immersive = screen === "welcome" || screen === "calculating";
 
   useLayoutEffect(() => {
+    if (typeof window !== "undefined" && shouldSkipWelcomeToDiagnosis()) {
+      setScreen("start");
+      return;
+    }
     if (deepLinkConsumedRef.current) return;
     const p = pendingDeepLinkRef.current;
     if (p.autoMissingStorage) {
       deepLinkConsumedRef.current = true;
       shouldSendLinePushRef.current = false;
-      setScreen("start");
+      setScreen("welcome");
       return;
     }
     if (p.showResult && p.resultType) {
@@ -1305,6 +1365,20 @@ export default function App() {
     }
   };
 
+  /** 診断スタート画面へは行かず、女神＝音声スタート（ミュート再生）に戻す */
+  const resetWelcomeToVoiceStart = () => {
+    welcomeEngagedRef.current = false;
+    setWelcomeMuted(true);
+    setWelcomeExiting(false);
+    const v = welcomeVideoRef.current;
+    if (v) {
+      v.muted = true;
+      v.currentTime = 0;
+      const p = v.play();
+      if (p && typeof p.catch === "function") p.catch(() => {});
+    }
+  };
+
   const handleWelcomeEnded = () => {
     const v = welcomeVideoRef.current;
     if (welcomeEngagedRef.current) {
@@ -1313,10 +1387,7 @@ export default function App() {
       setWelcomeExiting(true);
       welcomeExitTimerRef.current = window.setTimeout(() => {
         welcomeExitTimerRef.current = null;
-        welcomeEngagedRef.current = false;
-        setScreen("start");
-        setWelcomeExiting(false);
-        setWelcomeMuted(true);
+        resetWelcomeToVoiceStart();
       }, 480);
       return;
     }
@@ -1325,9 +1396,7 @@ export default function App() {
     }
     welcomeSilentSkipTimerRef.current = window.setTimeout(() => {
       welcomeSilentSkipTimerRef.current = null;
-      setScreen("start");
-      setWelcomeMuted(true);
-      setWelcomeExiting(false);
+      resetWelcomeToVoiceStart();
     }, 5000);
   };
 
@@ -1371,7 +1440,7 @@ export default function App() {
         window.history.replaceState({}, "", `${base}/` || "/");
       }
     }
-    setScreen("start");
+    setScreen("welcome");
     setWelcomeMuted(true);
     setWelcomeExiting(false);
     setCurrentQ(0);
@@ -1669,10 +1738,11 @@ export default function App() {
                 onEnded={handleWelcomeEnded}
               />
             </div>
-            <div className="welcome-overlay">
+            <div className="welcome-overlay welcome-overlay--dual">
               <button type="button" className="welcome-glass-btn" onClick={handleWelcomeSoundOn}>
-                音声をオンにして診断を始める 🔘
+                音声をオンにする
               </button>
+              <a className="welcome-line-btn" href={LINE_OFFICIAL_URL} target="_blank" rel="noopener noreferrer">LINEで診断を受ける</a>
             </div>
           </div>
         )}
