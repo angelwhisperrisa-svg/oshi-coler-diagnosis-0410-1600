@@ -660,9 +660,6 @@ const styles = `
     box-sizing: border-box;
   }
   .floating-note { margin-top: 2px; color: #999; font-size: 12px; }
-  .start-screen .start-btn + .start-btn {
-    margin-top: 12px;
-  }
 
   .progress-wrap { margin-bottom: 14px; }
   .progress-label {
@@ -1301,8 +1298,6 @@ export default function App() {
   const deepLinkConsumedRef = useRef(false);
   /** 診断（クイズ）完了後だけ URL を /result?type=&mode=free に同期する */
   const shouldSyncQuizResultUrlRef = useRef(false);
-  /** 診断完了直後のみ LINE Push を1回だけ送る（深リンク再表示では送らない） */
-  const shouldSendLinePushRef = useRef(false);
 
   const [screen, setScreen] = useState("welcome");
   const [welcomeMuted, setWelcomeMuted] = useState(true);
@@ -1337,22 +1332,11 @@ export default function App() {
     const p = pendingDeepLinkRef.current;
     if (p.autoMissingStorage) {
       deepLinkConsumedRef.current = true;
-      shouldSendLinePushRef.current = false;
       setScreen("welcome");
       return;
     }
     if (p.showResult && p.resultType) {
       deepLinkConsumedRef.current = true;
-      let resumeLineSend = false;
-      try {
-        if (typeof window !== "undefined") {
-          const pendingRaw = window.sessionStorage.getItem(PENDING_LINE_SEND_KEY);
-          resumeLineSend = normalizeTypeKey(pendingRaw || "") === p.resultType;
-        }
-      } catch (_) {
-        /* ignore */
-      }
-      shouldSendLinePushRef.current = resumeLineSend;
       resultKeyRef.current = p.resultType;
       setResultKey(p.resultType);
       setResultModeFull(Boolean(p.modeFull));
@@ -1374,7 +1358,6 @@ export default function App() {
       const storedType = normalizeTypeKey(readStoredOshiType() || "");
       if (pendingType && storedType && pendingType === storedType) {
         deepLinkConsumedRef.current = true;
-        shouldSendLinePushRef.current = true;
         resultKeyRef.current = pendingType;
         setResultKey(pendingType);
         setResultModeFull(false);
@@ -1486,24 +1469,6 @@ export default function App() {
     }, WELCOME_MUTED_END_DELAY_MS);
   };
 
-  const startQuiz = () => {
-    setLiffCompleteError("");
-    setLiffSaveLoading(false);
-    liffSaveInFlightRef.current = false;
-    try {
-      if (typeof window !== "undefined") window.sessionStorage.removeItem(PENDING_LINE_SEND_KEY);
-    } catch (_) {
-      /* ignore */
-    }
-    shouldSendLinePushRef.current = false;
-    liffMsgSentRef.current = false;
-    resultKeyRef.current = "";
-    setScreen("quiz");
-    setCurrentQ(0);
-    setScores(initialScores);
-    setResultKey("");
-  };
-
   const selectChoice = (scoreMap) => {
     const nextScores = { ...scores };
     Object.entries(scoreMap).forEach(([k, v]) => { nextScores[k] += v; });
@@ -1517,7 +1482,6 @@ export default function App() {
     resultKeyRef.current = topResultKey;
     setResultKey(topResultKey);
     setResultModeFull(false);
-    shouldSendLinePushRef.current = true;
     shouldSyncQuizResultUrlRef.current = true;
     setScreen("calculating");
   };
@@ -1532,7 +1496,6 @@ export default function App() {
       /* ignore */
     }
     liffMsgSentRef.current = false;
-    shouldSendLinePushRef.current = false;
     shouldSyncQuizResultUrlRef.current = false;
     clearStoredOshiType();
     if (typeof window !== "undefined") {
@@ -1552,22 +1515,15 @@ export default function App() {
     setResultModeFull(false);
   };
 
+  /** 結果画面でユーザーが「送信／再試行」したときのみ。handleComplete はここからのみ呼ぶ。 */
   const executePendingLiffSave = useCallback(async () => {
-    if (typeof window === "undefined") return;
-    if (screen !== "result") return;
+    if (typeof window === "undefined") return false;
+    if (screen !== "result") return false;
     const confirmedResultKey = resultKeyRef.current || resultKey;
-    if (!confirmedResultKey) return;
-    if (!REACT_APP_LIFF_ID) return;
-    try {
-      const pendingRaw = window.sessionStorage.getItem(PENDING_LINE_SEND_KEY);
-      if (normalizeTypeKey(pendingRaw || "") === normalizeTypeKey(confirmedResultKey)) {
-        shouldSendLinePushRef.current = true;
-      }
-    } catch (_) {
-      /* ignore */
-    }
-    if (!shouldSendLinePushRef.current || liffMsgSentRef.current) return;
-    if (liffSaveInFlightRef.current) return;
+    if (!confirmedResultKey) return false;
+    if (!REACT_APP_LIFF_ID) return false;
+    if (liffMsgSentRef.current) return false;
+    if (liffSaveInFlightRef.current) return false;
     liffSaveInFlightRef.current = true;
 
     setLiffCompleteError("");
@@ -1576,41 +1532,25 @@ export default function App() {
       const out = await handleComplete(confirmedResultKey);
       if (out.ok) {
         liffMsgSentRef.current = true;
-        shouldSendLinePushRef.current = false;
         setLiffCompleteError("");
-      } else if (out.kind === "login_redirect") {
-        /* liff.login() により遷移する。戻ったあと pageshow / effect で再試行 */
-      } else if (out.message) {
+        return true;
+      }
+      if (out.kind === "login_redirect") {
+        return false;
+      }
+      if (out.message) {
         setLiffCompleteError(out.message);
       }
+      return false;
     } catch (e) {
       console.warn("[handleComplete] error:", String(e));
       setLiffCompleteError("送信処理でエラーが発生しました。再度お試しください。");
+      return false;
     } finally {
       liffSaveInFlightRef.current = false;
       setLiffSaveLoading(false);
     }
   }, [screen, resultKey]);
-
-  useEffect(() => {
-    void executePendingLiffSave();
-  }, [executePendingLiffSave]);
-
-  useEffect(() => {
-    if (screen !== "result") return;
-    const run = () => {
-      void executePendingLiffSave();
-    };
-    window.addEventListener("pageshow", run);
-    const onVis = () => {
-      if (document.visibilityState === "visible") run();
-    };
-    document.addEventListener("visibilitychange", onVis);
-    return () => {
-      window.removeEventListener("pageshow", run);
-      document.removeEventListener("visibilitychange", onVis);
-    };
-  }, [screen, executePendingLiffSave]);
 
   useEffect(() => {
     if (screen !== "result") {
@@ -1629,6 +1569,9 @@ export default function App() {
 
   const handleLineContinueAfterResult = async () => {
     if (typeof window === "undefined") return;
+    const sent = await executePendingLiffSave();
+    if (!sent) return;
+
     if (!REACT_APP_LIFF_ID) {
       window.location.assign(LINE_OFFICIAL_URL);
       return;
@@ -1829,7 +1772,6 @@ export default function App() {
                 7つの質問で、あなただけの「推し色」が見つかる。色には感情がある。あなたはどの色に選ばれるのでしょう。
               </p>
               <a className="start-btn" href={LINE_OFFICIAL_URL} target="_blank" rel="noopener noreferrer">LINE登録して診断を始める✨</a>
-              <button type="button" className="start-btn" onClick={startQuiz}>LINE登録後はこちらから診断を始める</button>
               <div className="floating-note">全7問・約1分</div>
             </section>
           )}
