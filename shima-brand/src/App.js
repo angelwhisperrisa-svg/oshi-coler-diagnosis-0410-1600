@@ -1368,16 +1368,13 @@ export default function App() {
           "alreadySent=", liffMsgSentRef.current
         );
         if (shouldSendLinePushRef.current && !liffMsgSentRef.current) {
-          if (!loggedIn) {
-            console.warn("[liff.sendMessages] skipped because LIFF user is not logged in");
-            return;
-          }
           try {
             alert("color=" + resultKey);
             if (inClient) {
               await liff.sendMessages([{ type: "text", text: "color=" + resultKey }]);
               console.log("[liff.sendMessages] sent from client: color=" + resultKey);
             } else {
+              console.log("[liff.sendMessages] using server fallback push-color");
               const idToken = liff.getIDToken();
               if (!idToken) throw new Error("missing idToken for server fallback");
               const res = await fetch(`${window.location.origin}/api/line/push-color`, {
