@@ -1375,15 +1375,28 @@ export default function App() {
         const loggedIn = liff.isLoggedIn();
         console.log("[liff] isInClient:", inClient, "isLoggedIn:", loggedIn, "resultKey:", resultKey);
 
-        // --- liff.sendMessages: LINEアプリ内のみ ---
+        // --- liff.sendMessages: 診断完了直後かつLINEアプリ内のみ ---
+        console.log(
+          "[liff.sendMessages] precheck",
+          "inClient=", inClient,
+          "shouldSend=", shouldSendLinePushRef.current,
+          "alreadySent=", liffMsgSentRef.current
+        );
         if (inClient && shouldSendLinePushRef.current && !liffMsgSentRef.current) {
           try {
-            await liff.sendMessages([{ type: "text", text: `color=${resultKey}` }]);
+            await liff.sendMessages([{ type: "text", text: "color=" + resultKey }]);
             console.log("[liff.sendMessages] sent: color=" + resultKey);
             liffMsgSentRef.current = true;
           } catch (e) {
             console.warn("[liff.sendMessages] error:", String(e));
           }
+        } else {
+          console.warn(
+            "[liff.sendMessages] skipped",
+            "inClient=", inClient,
+            "shouldSend=", shouldSendLinePushRef.current,
+            "alreadySent=", liffMsgSentRef.current
+          );
         }
 
         // --- push-result: LINE内 or LINEブラウザ ---
