@@ -11,6 +11,7 @@ const BASE_FULL_URL = process.env.REACT_APP_BASE_FULL_URL || "https://thebase.in
 const RESULT_TYPE_KEYS = ["mint", "rose", "lavender", "ivory", "skyblue"];
 const REACT_APP_LIFF_ID = process.env.REACT_APP_LIFF_ID || "";
 const LINE_BRAND = "薫凛香房 公式LINE";
+const LIFF_EXTERNAL_REDIRECT_KEY = "shima_liff_external_redirect_once_v1";
 
 /** 診断タイプ保持（リッチメニュー等の /result?auto=true から分岐するため） */
 const OSHI_RESULT_STORAGE_KEY = "shima_oshi_result_v1";
@@ -1355,10 +1356,8 @@ export default function App() {
         if (cancelled) return;
 
         const inClient = liff.isInClient();
-        const loggedIn = liff.isLoggedIn();
         console.log("[liff] isInClient immediately after init:", inClient);
-        console.log("[liff] isInClient:", inClient, "isLoggedIn:", loggedIn, "resultKey:", resultKey);
-        alert("liff.isInClient()=" + String(inClient));
+        console.log("[liff] isInClient:", inClient, "resultKey:", resultKey);
 
         // --- liff.sendMessages: 診断完了直後に送信を試行 ---
         console.log(
@@ -1369,24 +1368,28 @@ export default function App() {
         );
         if (shouldSendLinePushRef.current && !liffMsgSentRef.current) {
           try {
-            alert("color=" + resultKey);
-            if (inClient) {
-              await liff.sendMessages([{ type: "text", text: "color=" + resultKey }]);
-              console.log("[liff.sendMessages] sent from client: color=" + resultKey);
-            } else {
-              console.log("[liff.sendMessages] using server fallback push-color");
-              const idToken = liff.getIDToken();
-              if (!idToken) throw new Error("missing idToken for server fallback");
-              const res = await fetch(`${window.location.origin}/api/line/push-color`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ idToken, resultType: resultKey })
-              });
-              if (!res.ok) {
-                const detail = await res.text();
-                throw new Error(`push-color failed: ${res.status} ${detail}`);
+            if (!inClient) {
+              const redirectOnceKey = `${LIFF_EXTERNAL_REDIRECT_KEY}:${resultKey}`;
+              const alreadyRedirected =
+                typeof window !== "undefined" &&
+                window.sessionStorage.getItem(redirectOnceKey) === "1";
+
+              if (!alreadyRedirected && typeof window !== "undefined") {
+                window.sessionStorage.setItem(redirectOnceKey, "1");
+                const statePath = `/result?type=${encodeURIComponent(resultKey)}&mode=free`;
+                const liffUrl = `https://liff.line.me/${REACT_APP_LIFF_ID}?liff.state=${encodeURIComponent(statePath)}`;
+                console.log("[liff] external browser detected. redirecting to LIFF URL:", liffUrl);
+                window.location.replace(liffUrl);
+                return;
               }
-              console.log("[liff.sendMessages] sent from server fallback: color=" + resultKey);
+              console.warn("[liff] external browser redirect already attempted; skip send.");
+              return;
+            }
+
+            await liff.sendMessages([{ type: "text", text: "color=" + resultKey }]);
+            console.log("[liff.sendMessages] sent from client: color=" + resultKey);
+            if (typeof window !== "undefined") {
+              window.sessionStorage.removeItem(`${LIFF_EXTERNAL_REDIRECT_KEY}:${resultKey}`);
             }
             liffMsgSentRef.current = true;
             shouldSendLinePushRef.current = false;
