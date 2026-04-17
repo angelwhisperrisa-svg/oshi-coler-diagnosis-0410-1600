@@ -1397,7 +1397,8 @@ export default function App() {
 
   const lineQrSrc = getLineQrSrc();
   const renderLineAcquisitionBlock = (typeKey) => {
-    const lineResultUrl = `https://line.me/R/oaMessage/@877xrsvw/?text=color%3D${typeKey}`;
+    cd ~/rinka_test/shima-brand && git add src/App.js && git commit -m "remove unused var" && git push origin main
+
     return (
     <div className="line-cta-hero">
       <p className="line-cta-hero-title">{LINE_BRAND}</p>
