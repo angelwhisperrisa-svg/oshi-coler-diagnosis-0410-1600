@@ -1184,7 +1184,6 @@ export default function App() {
   const welcomeSilentSkipTimerRef = useRef(null);
   const welcomeEngagedRef = useRef(false);
   const linePushSentRef = useRef(false);
-  const liffMsgSentRef = useRef(false);
 
   const progress = Math.round((currentQ / questions.length) * 100);
   const currentQuestion = questions[currentQ];
@@ -1396,27 +1395,6 @@ export default function App() {
     };
   }, [screen, resultKey, resultModeFull]);
 
-  useEffect(() => {
-    if (screen !== "result" || !resultKey) return;
-    if (!REACT_APP_LIFF_ID) return;
-    if (liffMsgSentRef.current) return;
-
-    let cancelled = false;
-    (async () => {
-      try {
-        const liff = (await import("@line/liff")).default;
-        await liff.init({ liffId: REACT_APP_LIFF_ID, withLoginOnExternalBrowser: false });
-        if (cancelled) return;
-        if (!liff.isInClient()) return;
-        await liff.sendMessages([{ type: "text", text: `color=${resultKey}` }]);
-        if (!cancelled) liffMsgSentRef.current = true;
-      } catch (e) {
-        console.warn("[liff.sendMessages]", String(e));
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [screen, resultKey]);
-
   const lineQrSrc = getLineQrSrc();
   const renderLineAcquisitionBlock = (typeKey) => {
     const lineResultUrl = `https://line.me/R/oaMessage/@877xrsvw/?text=color%3D${typeKey}`;
@@ -1427,11 +1405,7 @@ export default function App() {
         フル鑑定の続きはLINEで受け取れます。まずはQRコードで公式LINEを登録し、下のボタンでこの推し色結果を開いてください。
       </p>
       <img className="line-qr-big" src={lineQrSrc} alt={`${LINE_BRAND}のQRコード`} width={300} height={300} />
-      {lineResultUrl && (
-        <a className="line-result-open-btn" href={lineResultUrl} target="_blank" rel="noopener noreferrer">
-          LINEでこの推し色結果を開く
-        </a>
-      )}
+    
     </div>
     );
   };
