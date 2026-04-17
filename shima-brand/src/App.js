@@ -640,6 +640,9 @@ const styles = `
     text-wrap: pretty;
   }
   .start-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     border: none;
     border-radius: 999px;
     padding: 18px 52px;
@@ -652,6 +655,9 @@ const styles = `
     box-shadow: 0 8px 22px rgba(194, 160, 219, 0.36);
     min-height: 60px;
     min-width: 236px;
+    text-decoration: none;
+    text-align: center;
+    box-sizing: border-box;
   }
   .floating-note { margin-top: 2px; color: #999; font-size: 12px; }
 
@@ -1014,29 +1020,6 @@ const styles = `
     }
   }
 
-  .video-stage--intro {
-    flex-direction: column;
-    padding: clamp(12px, 4vw, 28px);
-    background:
-      radial-gradient(circle at 50% 18%, rgba(249, 242, 255, 0.14) 0%, transparent 48%),
-      radial-gradient(ellipse at 50% 55%, #1f1430 0%, #0f0818 58%, #050308 100%);
-  }
-  .intro-diagnosis-wrap {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    max-height: min(76vh, 680px);
-  }
-  .intro-diagnosis-wrap .orb {
-    animation: introDiagnosisIn 0.65s ease-out both;
-  }
-  @keyframes introDiagnosisIn {
-    from { opacity: 0; transform: translateY(14px) scale(0.98); }
-    to { opacity: 1; transform: translateY(0) scale(1); }
-  }
-
   .video-stage--final {
     background:
       radial-gradient(circle at 22% 18%, rgba(249, 242, 255, 0.12) 0%, transparent 42%),
@@ -1340,7 +1323,7 @@ export default function App() {
   const currentQuestion = questions[currentQ];
   const result = resultKey ? results[resultKey] : null;
 
-  const immersive = screen === "welcome" || screen === "calculating" || screen === "intro";
+  const immersive = screen === "welcome" || screen === "calculating";
 
   useLayoutEffect(() => {
     if (typeof window !== "undefined" && shouldSkipWelcomeToDiagnosis()) {
@@ -1498,24 +1481,6 @@ export default function App() {
       setWelcomeExiting(false);
       setScreen("intro");
     }, WELCOME_MUTED_END_DELAY_MS);
-  };
-
-  const startQuiz = () => {
-    setLiffCompleteError("");
-    setLiffSaveLoading(false);
-    liffSaveInFlightRef.current = false;
-    try {
-      if (typeof window !== "undefined") window.sessionStorage.removeItem(PENDING_LINE_SEND_KEY);
-    } catch (_) {
-      /* ignore */
-    }
-    shouldSendLinePushRef.current = false;
-    liffMsgSentRef.current = false;
-    resultKeyRef.current = "";
-    setScreen("quiz");
-    setCurrentQ(0);
-    setScores(initialScores);
-    setResultKey("");
   };
 
   const selectChoice = (scoreMap) => {
@@ -1832,7 +1797,7 @@ export default function App() {
             </p>
           </header>
 
-          {screen === "start" && (
+          {(screen === "start" || screen === "intro") && (
             <section className="card start-screen">
               <div className="orb">
                 <div className="orb-aurora" />
@@ -1842,7 +1807,7 @@ export default function App() {
               <p className="start-text">
                 7つの質問で、あなただけの「推し色」が見つかる。色には感情がある。あなたはどの色に選ばれるのでしょう。
               </p>
-              <button className="start-btn" onClick={startQuiz}>LINE登録して診断を始める✨</button>
+              <a className="start-btn" href={LINE_OFFICIAL_URL} target="_blank" rel="noopener noreferrer">LINE登録して診断を始める✨</a>
               <div className="floating-note">全7問・約1分</div>
             </section>
           )}
@@ -1922,18 +1887,6 @@ export default function App() {
                 音声をオンにする
               </button>
               <a className="welcome-line-btn" href={LINE_OFFICIAL_URL} target="_blank" rel="noopener noreferrer">LINEで診断を受ける</a>
-            </div>
-          </div>
-        )}
-
-        {screen === "intro" && (
-          <div className="video-stage video-stage--intro">
-            <div className="intro-diagnosis-wrap">
-              <div className="orb">
-                <div className="orb-aurora" />
-                <div className="orb-flow" />
-                <span className="orb-heart">💜</span>
-              </div>
             </div>
           </div>
         )}
