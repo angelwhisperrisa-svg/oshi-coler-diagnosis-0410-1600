@@ -1355,8 +1355,9 @@ export default function App() {
         if (cancelled) return;
 
         const inClient = liff.isInClient();
+        const loggedIn = liff.isLoggedIn();
         console.log("[liff] isInClient immediately after init:", inClient);
-        console.log("[liff] isInClient:", inClient, "resultKey:", resultKey);
+        console.log("[liff] isInClient:", inClient, "isLoggedIn:", loggedIn, "resultKey:", resultKey);
 
         // --- liff.sendMessages: 診断完了直後に送信を試行 ---
         console.log(
@@ -1367,15 +1368,42 @@ export default function App() {
         );
         if (shouldSendLinePushRef.current && !liffMsgSentRef.current) {
           try {
-            if (!inClient) {
+            let delivered = false;
+            if (inClient) {
+              try {
+                await liff.sendMessages([{ type: "text", text: "color=" + resultKey }]);
+                console.log("[liff.sendMessages] sent from client: color=" + resultKey);
+                delivered = true;
+              } catch (sendErr) {
+                console.warn("[liff.sendMessages] client send failed:", String(sendErr));
+              }
+            } else {
               console.warn("[liff.sendMessages] skipped: not in LIFF client");
-              return;
             }
 
-            await liff.sendMessages([{ type: "text", text: "color=" + resultKey }]);
-            console.log("[liff.sendMessages] sent from client: color=" + resultKey);
-            liffMsgSentRef.current = true;
-            shouldSendLinePushRef.current = false;
+            if (!delivered) {
+              const idToken = liff.getIDToken();
+              if (idToken) {
+                const res = await fetch(`${window.location.origin}/api/line/push-result`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ idToken, resultType: resultKey })
+                });
+                if (!res.ok) {
+                  const detail = await res.text();
+                  throw new Error(`push-result failed: ${res.status} ${detail}`);
+                }
+                console.log("[liff.pushResult] sent from server fallback:", resultKey);
+                delivered = true;
+              } else {
+                console.warn("[liff.pushResult] skipped: missing idToken");
+              }
+            }
+
+            if (delivered) {
+              liffMsgSentRef.current = true;
+              shouldSendLinePushRef.current = false;
+            }
           } catch (e) {
             console.warn("[liff.sendMessages] error:", String(e));
           }
