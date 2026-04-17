@@ -1310,6 +1310,7 @@ export default function App() {
 
   const startQuiz = () => {
     shouldSendLinePushRef.current = false;
+    liffMsgSentRef.current = false;
     setScreen("quiz");
     setCurrentQ(0);
     setScores(initialScores);
@@ -1335,6 +1336,7 @@ export default function App() {
 
   const resetDiagnosis = () => {
     linePushSentRef.current = false;
+    liffMsgSentRef.current = false;
     shouldSendLinePushRef.current = false;
     shouldSyncQuizResultUrlRef.current = false;
     clearStoredOshiType();
@@ -1374,7 +1376,7 @@ export default function App() {
         console.log("[liff] isInClient:", inClient, "isLoggedIn:", loggedIn, "resultKey:", resultKey);
 
         // --- liff.sendMessages: LINEアプリ内のみ ---
-        if (inClient && !liffMsgSentRef.current) {
+        if (inClient && shouldSendLinePushRef.current && !liffMsgSentRef.current) {
           try {
             await liff.sendMessages([{ type: "text", text: `color=${resultKey}` }]);
             console.log("[liff.sendMessages] sent: color=" + resultKey);
