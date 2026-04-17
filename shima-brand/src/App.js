@@ -19,9 +19,18 @@ async function handleComplete(resultKey) {
   try {
     const liff = (await import("@line/liff")).default;
     await liff.init({ liffId: REACT_APP_LIFF_ID, withLoginOnExternalBrowser: false });
-    if (liff.isLoggedIn()) {
+    userId = liff.getContext()?.userId || null;
+    if (!userId && liff.isLoggedIn()) {
       const profile = await liff.getProfile();
       userId = profile.userId;
+    }
+    if (!userId && liff.isInClient()) {
+      try {
+        const profile = await liff.getProfile();
+        userId = profile.userId;
+      } catch (_) {
+        /* isLoggedIn が false でも in-app では profile が取れる場合がある */
+      }
     }
   } catch (e) {
     console.log("LIFF取得失敗", e);
