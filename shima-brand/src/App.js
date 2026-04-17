@@ -1,52 +1,85 @@
-import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 
 const publicUrl = process.env.PUBLIC_URL || "";
 const VIDEO = {
   welcome: `${publicUrl}/videos/A_Oshiiro_welcome_1080p.mp4`,
   final: `${publicUrl}/videos/C_Oshiiro_Thank_you_and_invite_1080p.mp4`
 };
+/** 女神動画の次に約15秒表示する「診断内容」ビジュアル（同一パスに PNG 等を置けば差し替え可） */
+const INTRO_DIAGNOSIS_IMAGE = `${publicUrl}/images/shindan-rainbow-intro.svg`;
+const INTRO_DIAGNOSIS_MS = 15000;
 const LINE_OFFICIAL_URL = "https://line.me/R/ti/p/@877xrsvw";
 const BASE_FULL_URL = process.env.REACT_APP_BASE_FULL_URL || "https://thebase.in/";
 
 const RESULT_TYPE_KEYS = ["mint", "rose", "lavender", "ivory", "skyblue"];
 const REACT_APP_LIFF_ID = process.env.REACT_APP_LIFF_ID || "";
+/** LIFF ログイン遷移後に save-result を再開するためのフラグ（値は resultKey） */
+const PENDING_LINE_SEND_KEY = "pendingLineSend";
 
-/** Instagram→LINE→LIFF 診断完了時: userId 取得後にサーバーへ保存し push させる */
+/**
+ * Instagram→LINE→LIFF 診断完了時: ログイン確認 → getProfile で userId 取得後のみ save-result。
+ * @returns {Promise<{ ok: true } | { ok: false, kind: "login_redirect" } | { ok: false, kind: "error", message: string }>}
+ */
 async function handleComplete(resultKey) {
-  console.log("[DEBUG] handleComplete start", resultKey);
-  console.log("[DEBUG] about to fetch", { resultKey });
-  if (!REACT_APP_LIFF_ID || !RESULT_TYPE_KEYS.includes(resultKey)) return false;
+  if (!REACT_APP_LIFF_ID || !RESULT_TYPE_KEYS.includes(resultKey)) {
+    return { ok: false, kind: "error", message: "診断結果の送信設定が無効です。" };
+  }
+  let liff;
+  try {
+    liff = (await import("@line/liff")).default;
+    await liff.init({ liffId: REACT_APP_LIFF_ID, withLoginOnExternalBrowser: false });
+  } catch (e) {
+    console.warn("[handleComplete] liff.init failed", e);
+    return { ok: false, kind: "error", message: "LINE連携の初期化に失敗しました。しばらくしてから再度お試しください。" };
+  }
+
+  if (!liff.isLoggedIn()) {
+    try {
+      if (typeof window !== "undefined") window.sessionStorage.setItem(PENDING_LINE_SEND_KEY, resultKey);
+    } catch (_) {
+      /* ignore */
+    }
+    liff.login();
+    return { ok: false, kind: "login_redirect" };
+  }
+
   let userId = null;
   try {
-    const liff = (await import("@line/liff")).default;
-    await liff.init({ liffId: REACT_APP_LIFF_ID, withLoginOnExternalBrowser: false });
-    userId = liff.getContext()?.userId || null;
-    if (!userId && liff.isLoggedIn()) {
-      const profile = await liff.getProfile();
-      userId = profile.userId;
-    }
-    if (!userId && liff.isInClient()) {
-      try {
-        const profile = await liff.getProfile();
-        userId = profile.userId;
-      } catch (_) {
-        /* isLoggedIn が false でも in-app では profile が取れる場合がある */
-      }
+    const profile = await liff.getProfile();
+    userId = profile?.userId || null;
+  } catch (e) {
+    console.warn("[handleComplete] getProfile failed", e);
+    return { ok: false, kind: "error", message: "LINEのユーザー情報を取得できませんでした。LINEアプリから開き直してお試しください。" };
+  }
+
+  if (!userId) {
+    return { ok: false, kind: "error", message: "ユーザーIDを取得できませんでした。LINEアプリから開き直してお試しください。" };
+  }
+
+  console.log("userId:", userId);
+
+  try {
+    const res = await fetch(`${typeof window !== "undefined" ? window.location.origin : ""}/api/save-result`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, resultKey })
+    });
+    if (!res.ok) {
+      const t = await res.text();
+      console.warn("[handleComplete] save-result failed", t);
+      return { ok: false, kind: "error", message: "結果の送信に失敗しました。もう一度お試しください。" };
     }
   } catch (e) {
-    console.log("LIFF取得失敗", e);
+    console.warn("[handleComplete] fetch failed", e);
+    return { ok: false, kind: "error", message: "通信エラーが発生しました。通信状況をご確認のうえ、再度お試しください。" };
   }
-  if (!userId) return false;
-  const res = await fetch(`${typeof window !== "undefined" ? window.location.origin : ""}/api/save-result`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ userId, resultKey })
-  });
-  if (!res.ok) {
-    console.warn("[handleComplete] save-result failed", await res.text());
-    return false;
+
+  try {
+    if (typeof window !== "undefined") window.sessionStorage.removeItem(PENDING_LINE_SEND_KEY);
+  } catch (_) {
+    /* ignore */
   }
-  return true;
+  return { ok: true };
 }
 
 /** 診断タイプ保持（リッチメニュー等の /result?auto=true から分岐するため） */
@@ -455,10 +488,10 @@ const styles = `
       max-width: 21ch;
     }
     .start-btn {
-      min-height: 47px;
-      min-width: 194px;
-      padding: 10px 28px;
-      font-size: clamp(16px, 4.6vw, 19px);
+      min-height: 50px;
+      min-width: 208px;
+      padding: 12px 30px;
+      font-size: clamp(17px, 4.8vw, 20px);
     }
     .floating-note { margin-top: 1px; }
   }
@@ -608,16 +641,16 @@ const styles = `
   .start-btn {
     border: none;
     border-radius: 999px;
-    padding: 16px 46px;
+    padding: 18px 52px;
     background: linear-gradient(135deg, #e7b3cc, #cfa9e8);
     color: #fff;
-    font-size: clamp(20px, 5.8vw, 25px);
+    font-size: clamp(21px, 6vw, 26px);
     letter-spacing: 2px;
     font-family: "Shippori Mincho", serif;
     cursor: pointer;
     box-shadow: 0 8px 22px rgba(194, 160, 219, 0.36);
-    min-height: 56px;
-    min-width: 220px;
+    min-height: 60px;
+    min-width: 236px;
   }
   .floating-note { margin-top: 2px; color: #999; font-size: 12px; }
 
@@ -877,6 +910,54 @@ const styles = `
   .retry-btn:hover {
     color: #7a6a96;
   }
+  .result-liff-error {
+    width: 96%;
+    max-width: min(96vw, 900px);
+    margin: 0 auto 14px;
+    padding: 14px 16px;
+    border-radius: 16px;
+    background: rgba(254, 242, 242, 0.92);
+    border: 1px solid rgba(248, 113, 113, 0.45);
+    color: #7f1d1d;
+    text-align: left;
+  }
+  .result-liff-error__text {
+    margin: 0 0 12px;
+    font-size: clamp(13px, 3.5vw, 15px);
+    line-height: 1.55;
+    font-weight: 600;
+  }
+  .result-liff-error__retry {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 999px;
+    padding: 10px 20px;
+    font-family: inherit;
+    font-size: clamp(13px, 3.4vw, 15px);
+    font-weight: 700;
+    cursor: pointer;
+    color: #fff;
+    background: linear-gradient(135deg, #7c3aed, #a855f7);
+  }
+  .result-liff-error__retry:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+  }
+  .result-liff-sending {
+    width: 96%;
+    max-width: min(96vw, 900px);
+    margin: 0 auto 12px;
+    padding: 12px 16px;
+    border-radius: 14px;
+    background: rgba(245, 240, 255, 0.85);
+    border: 1px solid rgba(192, 132, 252, 0.35);
+    color: #5c5470;
+    font-size: clamp(13px, 3.5vw, 15px);
+    font-weight: 600;
+    text-align: center;
+  }
   .page--immersive {
     padding: 0;
     min-height: 100dvh;
@@ -930,6 +1011,35 @@ const styles = `
       object-fit: contain;
       object-position: center top;
     }
+  }
+
+  .video-stage--intro {
+    flex-direction: column;
+    padding: clamp(12px, 4vw, 28px);
+    background:
+      radial-gradient(circle at 50% 18%, rgba(249, 242, 255, 0.14) 0%, transparent 48%),
+      radial-gradient(ellipse at 50% 55%, #1f1430 0%, #0f0818 58%, #050308 100%);
+  }
+  .intro-diagnosis-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-height: min(76vh, 680px);
+  }
+  .intro-diagnosis-img {
+    width: min(92vw, 540px);
+    max-height: min(70vh, 620px);
+    height: auto;
+    object-fit: contain;
+    border-radius: 18px;
+    box-shadow: 0 18px 52px rgba(0, 0, 0, 0.38), 0 0 0 1px rgba(255, 255, 255, 0.07);
+    animation: introDiagnosisIn 0.65s ease-out both;
+  }
+  @keyframes introDiagnosisIn {
+    from { opacity: 0; transform: translateY(14px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
   }
 
   .video-stage--final {
@@ -1227,12 +1337,15 @@ export default function App() {
   const welcomeSilentSkipTimerRef = useRef(null);
   const welcomeEngagedRef = useRef(false);
   const liffMsgSentRef = useRef(false);
+  const liffSaveInFlightRef = useRef(false);
+  const [liffCompleteError, setLiffCompleteError] = useState("");
+  const [liffSaveLoading, setLiffSaveLoading] = useState(false);
 
   const progress = Math.round((currentQ / questions.length) * 100);
   const currentQuestion = questions[currentQ];
   const result = resultKey ? results[resultKey] : null;
 
-  const immersive = screen === "welcome" || screen === "calculating";
+  const immersive = screen === "welcome" || screen === "calculating" || screen === "intro";
 
   useLayoutEffect(() => {
     if (typeof window !== "undefined" && shouldSkipWelcomeToDiagnosis()) {
@@ -1249,7 +1362,16 @@ export default function App() {
     }
     if (p.showResult && p.resultType) {
       deepLinkConsumedRef.current = true;
-      shouldSendLinePushRef.current = false;
+      let resumeLineSend = false;
+      try {
+        if (typeof window !== "undefined") {
+          const pendingRaw = window.sessionStorage.getItem(PENDING_LINE_SEND_KEY);
+          resumeLineSend = normalizeTypeKey(pendingRaw || "") === p.resultType;
+        }
+      } catch (_) {
+        /* ignore */
+      }
+      shouldSendLinePushRef.current = resumeLineSend;
       resultKeyRef.current = p.resultType;
       setResultKey(p.resultType);
       setResultModeFull(Boolean(p.modeFull));
@@ -1258,6 +1380,26 @@ export default function App() {
         const base = (publicUrl || "").replace(/\/$/, "");
         const modeStr = p.modeFull ? "full" : "free";
         const qs = `?type=${encodeURIComponent(p.resultType)}&mode=${modeStr}`;
+        const path = base ? `${base}/result${qs}` : `/result${qs}`;
+        window.history.replaceState({}, "", path);
+      }
+    } else if (typeof window !== "undefined") {
+      let pendingType = null;
+      try {
+        pendingType = normalizeTypeKey(window.sessionStorage.getItem(PENDING_LINE_SEND_KEY) || "");
+      } catch (_) {
+        /* ignore */
+      }
+      const storedType = normalizeTypeKey(readStoredOshiType() || "");
+      if (pendingType && storedType && pendingType === storedType) {
+        deepLinkConsumedRef.current = true;
+        shouldSendLinePushRef.current = true;
+        resultKeyRef.current = pendingType;
+        setResultKey(pendingType);
+        setResultModeFull(false);
+        setScreen("result");
+        const base = (publicUrl || "").replace(/\/$/, "");
+        const qs = `?type=${encodeURIComponent(pendingType)}&mode=free`;
         const path = base ? `${base}/result${qs}` : `/result${qs}`;
         window.history.replaceState({}, "", path);
       }
@@ -1296,7 +1438,17 @@ export default function App() {
       window.clearTimeout(welcomeSilentSkipTimerRef.current);
       welcomeSilentSkipTimerRef.current = null;
     }
+    if (welcomeExitTimerRef.current) {
+      window.clearTimeout(welcomeExitTimerRef.current);
+      welcomeExitTimerRef.current = null;
+    }
     return undefined;
+  }, [screen]);
+
+  useEffect(() => {
+    if (screen !== "intro") return undefined;
+    const t = window.setTimeout(() => setScreen("start"), INTRO_DIAGNOSIS_MS);
+    return () => window.clearTimeout(t);
   }, [screen]);
 
   useEffect(() => () => {
@@ -1352,7 +1504,8 @@ export default function App() {
       setWelcomeExiting(true);
       welcomeExitTimerRef.current = window.setTimeout(() => {
         welcomeExitTimerRef.current = null;
-        resetWelcomeToVoiceStart();
+        setWelcomeExiting(false);
+        setScreen("intro");
       }, 480);
       return;
     }
@@ -1366,6 +1519,14 @@ export default function App() {
   };
 
   const startQuiz = () => {
+    setLiffCompleteError("");
+    setLiffSaveLoading(false);
+    liffSaveInFlightRef.current = false;
+    try {
+      if (typeof window !== "undefined") window.sessionStorage.removeItem(PENDING_LINE_SEND_KEY);
+    } catch (_) {
+      /* ignore */
+    }
     shouldSendLinePushRef.current = false;
     liffMsgSentRef.current = false;
     resultKeyRef.current = "";
@@ -1394,6 +1555,14 @@ export default function App() {
   };
 
   const resetDiagnosis = () => {
+    setLiffCompleteError("");
+    setLiffSaveLoading(false);
+    liffSaveInFlightRef.current = false;
+    try {
+      if (typeof window !== "undefined") window.sessionStorage.removeItem(PENDING_LINE_SEND_KEY);
+    } catch (_) {
+      /* ignore */
+    }
     liffMsgSentRef.current = false;
     shouldSendLinePushRef.current = false;
     shouldSyncQuizResultUrlRef.current = false;
@@ -1415,49 +1584,72 @@ export default function App() {
     setResultModeFull(false);
   };
 
-  useEffect(() => {
-    console.log("[DEBUG] useEffect fired");
+  const executePendingLiffSave = useCallback(async () => {
+    if (typeof window === "undefined") return;
     if (screen !== "result") return;
     const confirmedResultKey = resultKeyRef.current || resultKey;
-    if (!confirmedResultKey) {
-      console.warn("[liff] skip send: resultKey is not confirmed yet");
-      return;
-    }
-    if (!REACT_APP_LIFF_ID) {
-      console.warn("[liff] REACT_APP_LIFF_ID is not set");
-      return;
-    }
-
-    let cancelled = false;
-    (async () => {
-      if (!shouldSendLinePushRef.current || liffMsgSentRef.current) {
-        console.warn(
-          "[handleComplete] skipped",
-          "shouldSend=", shouldSendLinePushRef.current,
-          "alreadySent=", liffMsgSentRef.current
-        );
-        return;
+    if (!confirmedResultKey) return;
+    if (!REACT_APP_LIFF_ID) return;
+    try {
+      const pendingRaw = window.sessionStorage.getItem(PENDING_LINE_SEND_KEY);
+      if (normalizeTypeKey(pendingRaw || "") === normalizeTypeKey(confirmedResultKey)) {
+        shouldSendLinePushRef.current = true;
       }
-      console.log("[DEBUG] send trigger reached", {
-        resultKey: confirmedResultKey,
-        shouldSend: shouldSendLinePushRef.current,
-        alreadySent: liffMsgSentRef.current
-      });
-      try {
-        const ok = await handleComplete(confirmedResultKey);
-        if (cancelled) return;
-        if (ok) {
-          liffMsgSentRef.current = true;
-          shouldSendLinePushRef.current = false;
-          console.log("[handleComplete] save-result ok", confirmedResultKey);
-        }
-      } catch (e) {
-        console.warn("[handleComplete] error:", String(e));
-      }
-    })();
+    } catch (_) {
+      /* ignore */
+    }
+    if (!shouldSendLinePushRef.current || liffMsgSentRef.current) return;
+    if (liffSaveInFlightRef.current) return;
+    liffSaveInFlightRef.current = true;
 
-    return () => { cancelled = true; };
+    setLiffCompleteError("");
+    setLiffSaveLoading(true);
+    try {
+      const out = await handleComplete(confirmedResultKey);
+      if (out.ok) {
+        liffMsgSentRef.current = true;
+        shouldSendLinePushRef.current = false;
+        setLiffCompleteError("");
+      } else if (out.kind === "login_redirect") {
+        /* liff.login() により遷移する。戻ったあと pageshow / effect で再試行 */
+      } else if (out.message) {
+        setLiffCompleteError(out.message);
+      }
+    } catch (e) {
+      console.warn("[handleComplete] error:", String(e));
+      setLiffCompleteError("送信処理でエラーが発生しました。再度お試しください。");
+    } finally {
+      liffSaveInFlightRef.current = false;
+      setLiffSaveLoading(false);
+    }
   }, [screen, resultKey]);
+
+  useEffect(() => {
+    void executePendingLiffSave();
+  }, [executePendingLiffSave]);
+
+  useEffect(() => {
+    if (screen !== "result") return;
+    const run = () => {
+      void executePendingLiffSave();
+    };
+    window.addEventListener("pageshow", run);
+    const onVis = () => {
+      if (document.visibilityState === "visible") run();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.removeEventListener("pageshow", run);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [screen, executePendingLiffSave]);
+
+  useEffect(() => {
+    if (screen !== "result") {
+      setLiffCompleteError("");
+      setLiffSaveLoading(false);
+    }
+  }, [screen]);
 
   const RESULT_LINE_NEXT_COPY = `この先では、
 
@@ -1668,7 +1860,7 @@ export default function App() {
               <p className="start-text">
                 7つの質問で、あなただけの「推し色」が見つかる。色には感情がある。あなたはどの色に選ばれるのでしょう。
               </p>
-              <button className="start-btn" onClick={startQuiz}>診断スタート</button>
+              <button className="start-btn" onClick={startQuiz}>LINE登録して診断を始める✨</button>
               <div className="floating-note">全7問・約1分</div>
             </section>
           )}
@@ -1703,7 +1895,27 @@ export default function App() {
             </>
           )}
 
-          {screen === "result" && result && renderOshiResultCard(result, resultModeFull, resultKey)}
+          {screen === "result" && result && (
+            <>
+              {liffCompleteError ? (
+                <div className="result-liff-error" role="alert">
+                  <p className="result-liff-error__text">{liffCompleteError}</p>
+                  <button
+                    type="button"
+                    className="result-liff-error__retry"
+                    onClick={() => void executePendingLiffSave()}
+                    disabled={liffSaveLoading}
+                  >
+                    {liffSaveLoading ? "送信中…" : "再送信"}
+                  </button>
+                </div>
+              ) : null}
+              {liffSaveLoading && !liffCompleteError ? (
+                <div className="result-liff-sending">結果をLINEに送信中です…</div>
+              ) : null}
+              {renderOshiResultCard(result, resultModeFull, resultKey)}
+            </>
+          )}
             </main>
           </>
         )}
@@ -1728,6 +1940,18 @@ export default function App() {
                 音声をオンにする
               </button>
               <a className="welcome-line-btn" href={LINE_OFFICIAL_URL} target="_blank" rel="noopener noreferrer">LINEで診断を受ける</a>
+            </div>
+          </div>
+        )}
+
+        {screen === "intro" && (
+          <div className="video-stage video-stage--intro" role="img" aria-label="診断内容のご案内">
+            <div className="intro-diagnosis-wrap">
+              <img
+                className="intro-diagnosis-img"
+                src={INTRO_DIAGNOSIS_IMAGE}
+                alt="レインボーサークルの診断内容"
+              />
             </div>
           </div>
         )}
