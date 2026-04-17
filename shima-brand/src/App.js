@@ -11,7 +11,6 @@ const BASE_FULL_URL = process.env.REACT_APP_BASE_FULL_URL || "https://thebase.in
 const RESULT_TYPE_KEYS = ["mint", "rose", "lavender", "ivory", "skyblue"];
 const REACT_APP_LIFF_ID = process.env.REACT_APP_LIFF_ID || "";
 const LINE_BRAND = "薫凛香房 公式LINE";
-const LIFF_EXTERNAL_REDIRECT_KEY = "shima_liff_external_redirect_once_v1";
 
 /** 診断タイプ保持（リッチメニュー等の /result?auto=true から分岐するため） */
 const OSHI_RESULT_STORAGE_KEY = "shima_oshi_result_v1";
@@ -1369,28 +1368,12 @@ export default function App() {
         if (shouldSendLinePushRef.current && !liffMsgSentRef.current) {
           try {
             if (!inClient) {
-              const redirectOnceKey = `${LIFF_EXTERNAL_REDIRECT_KEY}:${resultKey}`;
-              const alreadyRedirected =
-                typeof window !== "undefined" &&
-                window.sessionStorage.getItem(redirectOnceKey) === "1";
-
-              if (!alreadyRedirected && typeof window !== "undefined") {
-                window.sessionStorage.setItem(redirectOnceKey, "1");
-                const statePath = `/result?type=${encodeURIComponent(resultKey)}&mode=free`;
-                const liffUrl = `https://liff.line.me/${REACT_APP_LIFF_ID}?liff.state=${encodeURIComponent(statePath)}`;
-                console.log("[liff] external browser detected. redirecting to LIFF URL:", liffUrl);
-                window.location.replace(liffUrl);
-                return;
-              }
-              console.warn("[liff] external browser redirect already attempted; skip send.");
+              console.warn("[liff.sendMessages] skipped: not in LIFF client");
               return;
             }
 
             await liff.sendMessages([{ type: "text", text: "color=" + resultKey }]);
             console.log("[liff.sendMessages] sent from client: color=" + resultKey);
-            if (typeof window !== "undefined") {
-              window.sessionStorage.removeItem(`${LIFF_EXTERNAL_REDIRECT_KEY}:${resultKey}`);
-            }
             liffMsgSentRef.current = true;
             shouldSendLinePushRef.current = false;
           } catch (e) {
