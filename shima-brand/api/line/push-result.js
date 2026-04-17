@@ -132,23 +132,24 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  const { idToken, accessToken, resultType, diagnosisText } = payload || {};
+  const { lineUserId, idToken, accessToken, resultType, diagnosisText } = payload || {};
+  const hasLineUserId = typeof lineUserId === "string" && lineUserId.length > 0;
   const hasIdToken = typeof idToken === "string" && idToken.length > 0;
   const hasAccessToken = typeof accessToken === "string" && accessToken.length > 0;
-  if ((!hasIdToken && !hasAccessToken) || !VALID_TYPES.includes(resultType)) {
-    res.status(400).json({ error: "Invalid token payload or resultType" });
+  if ((!hasLineUserId && !hasIdToken && !hasAccessToken) || !VALID_TYPES.includes(resultType)) {
+    res.status(400).json({ error: "Invalid identity payload or resultType" });
     return;
   }
 
-  let lineUserId = null;
-  if (hasIdToken && channelId) {
-    lineUserId = await verifyIdToken(idToken, channelId);
+  let resolvedLineUserId = hasLineUserId ? lineUserId : null;
+  if (!resolvedLineUserId && hasIdToken && channelId) {
+    resolvedLineUserId = await verifyIdToken(idToken, channelId);
   }
-  if (!lineUserId && hasAccessToken) {
-    lineUserId = await getUserIdFromAccessToken(accessToken);
+  if (!resolvedLineUserId && hasAccessToken) {
+    resolvedLineUserId = await getUserIdFromAccessToken(accessToken);
   }
-  if (!lineUserId) {
-    res.status(401).json({ error: "Invalid or expired id/access token" });
+  if (!resolvedLineUserId) {
+    res.status(401).json({ error: "Unable to resolve LINE user id" });
     return;
   }
 
@@ -172,7 +173,7 @@ module.exports = async function handler(req, res) {
       "Content-Type": "application/json",
       Authorization: `Bearer ${channelAccessToken}`
     },
-    body: JSON.stringify({ to: lineUserId, messages })
+    body: JSON.stringify({ to: resolvedLineUserId, messages })
   });
 
   if (!pushRes.ok) {
@@ -186,7 +187,7 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  const richMenuLinkResult = await linkUserRichMenu({ accessToken: channelAccessToken, lineUserId, resultType });
+  const richMenuLinkResult = await linkUserRichMenu({ accessToken: channelAccessToken, lineUserId: resolvedLineUserId, resultType });
   console.info("LINE rich menu link trace", {
     resultType,
     richMenuId: richMenuLinkResult.richMenuId || "",
