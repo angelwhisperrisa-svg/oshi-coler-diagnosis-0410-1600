@@ -16,6 +16,11 @@ const RESULT_TYPE_KEYS = ["mint", "rose", "lavender", "ivory", "skyblue"];
 const REACT_APP_LIFF_ID = process.env.REACT_APP_LIFF_ID || "";
 /** LIFF ログイン遷移後に push-result を再開するためのフラグ（値は resultKey） */
 const PENDING_LINE_SEND_KEY = "pendingLineSend";
+/**
+ * true: 結果画面で pending 不一致・送信済み・inFlight を無視し、liff ログイン済みなら必ず handleComplete を実行（再開不具合の切り分け用）。
+ * 切り分け完了後は false に戻してください。
+ */
+const DEBUG_LINE_RESUME_IGNORE_GUARDS = true;
 
 /**
  * Instagram→LINE→LIFF 診断完了時: /api/line/push-result へ必ず fetch を試行。
@@ -46,6 +51,12 @@ async function handleComplete(resultKey) {
       if (typeof window !== "undefined") window.sessionStorage.setItem(PENDING_LINE_SEND_KEY, resultKey);
     } catch (_) {
       /* ignore */
+    }
+    try {
+      const readBack = typeof window !== "undefined" ? window.sessionStorage.getItem(PENDING_LINE_SEND_KEY) : "";
+      console.log("[handleComplete] PENDING_LINE_SEND_KEY write/read", { wrote: resultKey, readBack });
+    } catch (e) {
+      console.log("[handleComplete] PENDING_LINE_SEND_KEY readBack error", e);
     }
     console.log("calling push-result API");
     try {
@@ -1396,6 +1407,8 @@ export default function App() {
   const liffSaveInFlightRef = useRef(false);
   const [liffCompleteError, setLiffCompleteError] = useState("");
   const [liffSaveLoading, setLiffSaveLoading] = useState(false);
+  /** LIFF ログインで別タブ／ブラウザに切り替えたあと戻ったとき、再開用 effect を再度走らせる */
+  const [lineResumeVisBump, setLineResumeVisBump] = useState(0);
 
   const progress = Math.round((currentQ / questions.length) * 100);
   const currentQuestion = questions[currentQ];
@@ -1620,21 +1633,78 @@ export default function App() {
     }
   }, [screen]);
 
-  /** liff.login() 復帰後: sessionStorage の pending と結果が一致し、未送信なら handleComplete を自動再実行 */
   useEffect(() => {
-    if (screen !== "result" || !REACT_APP_LIFF_ID) return undefined;
-    const rk = normalizeTypeKey(resultKeyRef.current || resultKey);
-    if (!rk) return undefined;
+    const onVis = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        setLineResumeVisBump((n) => n + 1);
+      }
+    };
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", onVis);
+      return () => document.removeEventListener("visibilitychange", onVis);
+    }
+    return undefined;
+  }, []);
 
-    let pending = null;
-    try {
-      pending = normalizeTypeKey(window.sessionStorage.getItem(PENDING_LINE_SEND_KEY) || "");
-    } catch (_) {
+  /** liff.login() 復帰後: pending 等の条件で handleComplete を自動再実行（DEBUG 時はガード解除） */
+  useEffect(() => {
+    console.log("[resume-push effect] ran", {
+      screen,
+      resultKey,
+      resultKeyRef: resultKeyRef.current,
+      lineResumeVisBump,
+      hasLiffId: Boolean(REACT_APP_LIFF_ID),
+      DEBUG_LINE_RESUME_IGNORE_GUARDS
+    });
+
+    if (!REACT_APP_LIFF_ID) {
+      console.log("[resume-push effect] exit: no REACT_APP_LIFF_ID");
       return undefined;
     }
-    if (!pending || pending !== rk) return undefined;
-    if (liffMsgSentRef.current) return undefined;
-    if (liffSaveInFlightRef.current) return undefined;
+
+    if (screen !== "result") {
+      console.log("[resume-push effect] exit: screen !== result", { screen });
+      return undefined;
+    }
+
+    const rk = normalizeTypeKey(resultKeyRef.current || resultKey);
+    console.log("[resume-push effect] rk (normalized)", rk);
+    if (!rk) {
+      console.log("[resume-push effect] exit: empty rk");
+      return undefined;
+    }
+
+    let pendingRaw = "";
+    let pending = null;
+    try {
+      pendingRaw = window.sessionStorage.getItem(PENDING_LINE_SEND_KEY) || "";
+      pending = normalizeTypeKey(pendingRaw);
+    } catch (e) {
+      console.log("[resume-push effect] sessionStorage read error", e);
+    }
+    console.log("[resume-push effect] PENDING_LINE_SEND_KEY", {
+      raw: pendingRaw,
+      normalizedPending: pending,
+      rk,
+      pendingMatchesRk: pending === rk
+    });
+
+    if (!DEBUG_LINE_RESUME_IGNORE_GUARDS) {
+      if (!pending || pending !== rk) {
+        console.log("[resume-push effect] exit: pending missing or mismatch");
+        return undefined;
+      }
+      if (liffMsgSentRef.current) {
+        console.log("[resume-push effect] exit: liffMsgSentRef already true");
+        return undefined;
+      }
+      if (liffSaveInFlightRef.current) {
+        console.log("[resume-push effect] exit: liffSaveInFlightRef already true");
+        return undefined;
+      }
+    } else {
+      console.log("[resume-push effect] DEBUG: skip pending / sent / inFlight guards");
+    }
 
     let cancelled = false;
     (async () => {
@@ -1645,24 +1715,35 @@ export default function App() {
         const liffMod = await import("@line/liff");
         const liff = liffMod.default;
         await liff.init({ liffId: REACT_APP_LIFF_ID, withLoginOnExternalBrowser: false });
-        if (cancelled) return;
-        if (!liff.isLoggedIn()) {
+        if (cancelled) {
+          console.log("[resume-push effect] async aborted (cancelled)");
           return;
         }
-        if (liffMsgSentRef.current) return;
+        const loggedIn = typeof liff.isLoggedIn === "function" && liff.isLoggedIn();
+        console.log("[resume-push effect] after liff.init", { loggedIn });
+        if (!loggedIn) {
+          console.log("[resume-push effect] exit async: liff.isLoggedIn() is false (no handleComplete)");
+          return;
+        }
+        if (!DEBUG_LINE_RESUME_IGNORE_GUARDS && liffMsgSentRef.current) {
+          console.log("[resume-push effect] exit async: already sent");
+          return;
+        }
+        console.log("[resume-push effect] calling handleComplete", rk);
         const out = await handleComplete(rk);
+        console.log("[resume-push effect] handleComplete returned", out);
         if (cancelled) return;
         if (out.ok) {
           liffMsgSentRef.current = true;
           setLiffCompleteError("");
           await openLineOfficialAccountLink();
         } else if (out.kind === "login_redirect") {
-          /* 再ログインが必要な場合のみ */
+          console.log("[resume-push effect] handleComplete asked login_redirect again");
         } else if (out.message) {
           setLiffCompleteError(out.message);
         }
       } catch (e) {
-        console.warn("[pending LINE send resume]", e);
+        console.warn("[resume-push effect] catch", e);
         if (!cancelled) {
           setLiffCompleteError("送信処理でエラーが発生しました。もう一度ボタンからお試しください。");
         }
@@ -1677,7 +1758,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [screen, resultKey]);
+  }, [screen, resultKey, lineResumeVisBump]);
 
   const RESULT_LINE_NEXT_COPY = `この先では、
 
