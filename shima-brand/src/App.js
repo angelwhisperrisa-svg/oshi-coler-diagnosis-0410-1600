@@ -1812,17 +1812,12 @@ export default function App() {
         type="button"
         className="result-line-next-btn"
         disabled={liffSaveLoading}
-        onClick={async (ev) => {
-          ev.preventDefault();
-          alert("LINEボタン: onClick");
-          console.log("[LINEボタン] alert直後・handleComplete呼ぶ前", { resultKey });
-          alert("handleComplete呼ぶ前");
-          console.log("CLICK FIRED");
+        onClick={async (e) => {
+          e.preventDefault();
+          console.log("CLICK OK");
           const res = await handleComplete(resultKey);
-          console.log("handleComplete result:", res);
-          if (res && res.ok) {
-            window.location.href = LINE_OFFICIAL_URL;
-          }
+          console.log("RESULT:", res);
+          return; // ここで止める
         }}
       >
         LINEで続きを受け取る🩷
