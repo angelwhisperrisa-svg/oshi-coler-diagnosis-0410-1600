@@ -154,10 +154,18 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+    const rawChannelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+    const channelAccessToken =
+      typeof rawChannelAccessToken === "string" ? rawChannelAccessToken.trim() : "";
     const channelId = process.env.LINE_CHANNEL_ID;
+    /** Messaging API の「チャネルアクセストークン」と一致している必要あり（Vercel では再発行後の更新も要確認） */
+    console.log("[push-result] LINE_CHANNEL_ACCESS_TOKEN", {
+      set: Boolean(channelAccessToken),
+      length: channelAccessToken.length,
+      hasWhitespaceOnly: typeof rawChannelAccessToken === "string" && rawChannelAccessToken.length > 0 && !channelAccessToken
+    });
     if (!channelAccessToken) {
-      console.log("[push-result] failure: LINE_CHANNEL_ACCESS_TOKEN 未設定");
+      console.log("[push-result] failure: LINE_CHANNEL_ACCESS_TOKEN 未設定（または空白のみ）");
       res.status(500).json({
         success: false,
         failure: true,
@@ -245,6 +253,7 @@ module.exports = async function handler(req, res) {
         body: JSON.stringify({ to: resolvedLineUserId, messages })
       });
       pushResponseText = await pushRes.text();
+      console.log("LINE API response:", pushRes.status);
     } catch (e) {
       console.log("[push-result] pushMessage fetch error (catch)", String(e));
       res.status(502).json({

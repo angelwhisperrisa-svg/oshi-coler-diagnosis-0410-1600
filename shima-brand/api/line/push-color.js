@@ -21,8 +21,8 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  const accessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
-  const channelId = process.env.LINE_CHANNEL_ID;
+  const accessToken = (process.env.LINE_CHANNEL_ACCESS_TOKEN || "").trim();
+  const channelId = (process.env.LINE_CHANNEL_ID || "").trim();
   if (!accessToken || !channelId) {
     res.status(500).json({ error: "Server missing LINE_CHANNEL_ACCESS_TOKEN or LINE_CHANNEL_ID" });
     return;
@@ -62,9 +62,11 @@ module.exports = async function handler(req, res) {
       messages: [{ type: "text", text }]
     })
   });
+  const pushBodyText = await pushRes.text().catch(() => "");
+  console.log("LINE API response:", pushRes.status);
 
   if (!pushRes.ok) {
-    const detail = await pushRes.text();
+    const detail = pushBodyText;
     res.status(502).json({
       error: "LINE Messaging API push failed",
       status: pushRes.status,

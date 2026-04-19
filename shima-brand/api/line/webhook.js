@@ -1,7 +1,7 @@
 const crypto = require("crypto");
 
-const CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET;
-const CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+const CHANNEL_SECRET = (process.env.LINE_CHANNEL_SECRET || "").trim();
+const CHANNEL_ACCESS_TOKEN = (process.env.LINE_CHANNEL_ACCESS_TOKEN || "").trim();
 
 const COLOR_MESSAGES = {
   mint: `🌿 あなたの推し色は「ミントグリーン」
@@ -196,7 +196,7 @@ function detectColor(t) {
 }
 
 async function replyMessage(replyToken, text) {
-  await fetch("https://api.line.me/v2/bot/message/reply", {
+  const response = await fetch("https://api.line.me/v2/bot/message/reply", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -207,6 +207,11 @@ async function replyMessage(replyToken, text) {
       messages: [{ type: "text", text }],
     }),
   });
+  const replyBody = await response.text().catch(() => "");
+  console.log("LINE API response:", response.status);
+  if (!response.ok) {
+    console.log("[webhook] LINE reply API body:", replyBody.slice(0, 500));
+  }
 }
 
 function verifySignature(body, signature) {
