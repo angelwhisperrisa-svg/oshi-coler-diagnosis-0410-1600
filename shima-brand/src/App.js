@@ -1819,7 +1819,6 @@ export default function App() {
     <div className="result-line-next-wrap">
       <p className="result-line-next-copy">{RESULT_LINE_NEXT_COPY}</p>
       <a
-        href={LINE_OFFICIAL_URL}
         role="button"
         className="result-line-next-btn"
         aria-disabled={liffSaveLoading}
