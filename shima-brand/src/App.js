@@ -22,6 +22,7 @@ const PENDING_LINE_SEND_KEY = "pendingLineSend";
  * @returns {Promise<{ ok: true } | { ok: false, kind: "login_redirect" } | { ok: false, kind: "error", message: string }>}
  */
 async function handleComplete(resultKey) {
+  console.log("handleComplete START");
   console.log("finalResultKey:", resultKey);
   console.log("[handleComplete] start", { resultKey, hasLiffId: Boolean(REACT_APP_LIFF_ID) });
 
@@ -56,6 +57,7 @@ async function handleComplete(resultKey) {
     }
     const redirectUri = typeof window !== "undefined" ? window.location.href : "";
     console.log("[handleComplete] liff.login redirectUri:", redirectUri);
+    console.log("before liff.login");
     liff.login({ redirectUri });
     console.log("[handleComplete] return: login_redirect (liff.login with redirectUri)");
     return { ok: false, kind: "login_redirect" };
@@ -64,6 +66,7 @@ async function handleComplete(resultKey) {
   let profile;
   try {
     profile = await liff.getProfile();
+    console.log("after getProfile", profile);
   } catch (e) {
     console.warn("[handleComplete] getProfile failed", e);
     console.log("[handleComplete] return: getProfile failed");
@@ -92,7 +95,7 @@ async function handleComplete(resultKey) {
   };
 
   try {
-    console.log("calling push-result API", pushBody);
+    console.log("calling push-result API");
     const res = await fetch(`${origin}/api/line/push-result`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
