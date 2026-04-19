@@ -29,6 +29,7 @@ const LIFF_LOGIN_STARTED_KEY = "liff_login_started";
  * @returns {Promise<{ ok: true } | { ok: false, kind: "error", message: string }>}
  */
 async function handleComplete(resultKey) {
+  alert("handleComplete内");
   console.log('handleComplete start');
   console.log("CURRENT URL:", window.location.href);
   console.log("finalResultKey:", resultKey);
