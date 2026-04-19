@@ -46,6 +46,8 @@ async function handleComplete(resultKey) {
     return { ok: false, kind: "error", message: "LINE連携の初期化に失敗しました。しばらくしてから再度お試しください。" };
   }
 
+  alert("liff.isLoggedIn(): " + String(liff.isLoggedIn()));
+
   if (!liff.isLoggedIn()) {
     try {
       if (typeof window !== "undefined") window.sessionStorage.setItem(PENDING_LINE_SEND_KEY, resultKey);
