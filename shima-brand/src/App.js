@@ -16,6 +16,8 @@ const RESULT_TYPE_KEYS = ["mint", "rose", "lavender", "ivory", "skyblue"];
 const REACT_APP_LIFF_ID = process.env.REACT_APP_LIFF_ID || "";
 /** LIFF ログイン遷移後に push-result を再開するためのフラグ（値は resultKey） */
 const PENDING_LINE_SEND_KEY = "pendingLineSend";
+/** 同一セッションでの liff.login 多重起動防止（push 成功時に削除） */
+const LIFF_LOGIN_STARTED_KEY = "liff_login_started";
 
 /**
  * 未ログイン時は liff.login({ redirectUri }) のみ（現在の URL＝/result?type=… を維持）。ログイン後に getProfile → /api/line/push-result。
@@ -23,6 +25,7 @@ const PENDING_LINE_SEND_KEY = "pendingLineSend";
  */
 async function handleComplete(resultKey) {
   console.log("handleComplete START");
+  console.log("CURRENT URL:", window.location.href);
   console.log("finalResultKey:", resultKey);
   console.log("[handleComplete] start", { resultKey, hasLiffId: Boolean(REACT_APP_LIFF_ID) });
 
@@ -34,14 +37,14 @@ async function handleComplete(resultKey) {
   try {
     liff = (await import("@line/liff")).default;
     console.log("liff.init start");
-    await liff.init({ liffId: REACT_APP_LIFF_ID, withLoginOnExternalBrowser: false });
+    await liff.init({ liffId: REACT_APP_LIFF_ID });
+    console.log("liff.isLoggedIn:", liff.isLoggedIn());
+    console.log("liff.isInClient:", liff.isInClient());
   } catch (e) {
     console.warn("[handleComplete] liff.init failed", e);
     console.log("[handleComplete] return: liff.init failed");
     return { ok: false, kind: "error", message: "LINE連携の初期化に失敗しました。しばらくしてから再度お試しください。" };
   }
-
-  console.log("liff.isLoggedIn:", liff.isLoggedIn());
 
   if (!liff.isLoggedIn()) {
     try {
@@ -54,6 +57,26 @@ async function handleComplete(resultKey) {
       console.log("[handleComplete] PENDING_LINE_SEND_KEY write/read", { wrote: resultKey, readBack });
     } catch (e) {
       console.log("[handleComplete] PENDING_LINE_SEND_KEY readBack error", e);
+    }
+    let loginAlreadyStarted = false;
+    try {
+      loginAlreadyStarted =
+        typeof window !== "undefined" && Boolean(window.sessionStorage.getItem(LIFF_LOGIN_STARTED_KEY));
+    } catch (_) {
+      /* ignore */
+    }
+    if (loginAlreadyStarted) {
+      console.log("[handleComplete] skip liff.login: liff_login_started already set");
+      return {
+        ok: false,
+        kind: "error",
+        message: "ログイン処理が既に開始されています。LINEアプリで開き直すか、しばらく待ってから再度お試しください。"
+      };
+    }
+    try {
+      if (typeof window !== "undefined") window.sessionStorage.setItem(LIFF_LOGIN_STARTED_KEY, "1");
+    } catch (_) {
+      /* ignore */
     }
     const redirectUri = typeof window !== "undefined" ? window.location.href : "";
     console.log("[handleComplete] liff.login redirectUri:", redirectUri);
@@ -120,7 +143,10 @@ async function handleComplete(resultKey) {
   }
 
   try {
-    if (typeof window !== "undefined") window.sessionStorage.removeItem(PENDING_LINE_SEND_KEY);
+    if (typeof window !== "undefined") {
+      window.sessionStorage.removeItem(PENDING_LINE_SEND_KEY);
+      window.sessionStorage.removeItem(LIFF_LOGIN_STARTED_KEY);
+    }
   } catch (_) {
     /* ignore */
   }
@@ -131,13 +157,15 @@ async function handleComplete(resultKey) {
 /**
  * 公式LINE（友だち追加）へ。LIFF 内は external:false で LINE 内ブラウザを切り替えやすい。
  * openWindow が無い／失敗時は同一 WebView で location.assign。
+ * （自動再開有効時のみ参照 — DEBUG 単一路径中は未使用）
  */
+// eslint-disable-next-line no-unused-vars
 async function openLineOfficialAccountLink() {
   if (typeof window === "undefined") return;
   if (REACT_APP_LIFF_ID) {
     try {
       const liff = (await import("@line/liff")).default;
-      await liff.init({ liffId: REACT_APP_LIFF_ID, withLoginOnExternalBrowser: false });
+      await liff.init({ liffId: REACT_APP_LIFF_ID });
       const inClient = typeof liff.isInClient === "function" && liff.isInClient();
       if (inClient && typeof liff.openWindow === "function") {
         liff.openWindow({ url: LINE_OFFICIAL_URL, external: false });
@@ -175,6 +203,7 @@ function normalizeTypeKey(v) {
 }
 
 /** state が空でも URL ?type= や pending から診断結果キーを復元する（LIFF ログイン復帰用） */
+// eslint-disable-next-line no-unused-vars
 function resolveFinalResultKey(resultKeyFromState, typeFromUrlRaw, pendingRaw) {
   const fromState = normalizeTypeKey((resultKeyFromState || "").trim() || "");
   const fromUrl = normalizeTypeKey((typeFromUrlRaw || "").trim() || "");
@@ -1400,8 +1429,10 @@ export default function App() {
   const liffSaveInFlightRef = useRef(false);
   const [liffCompleteError, setLiffCompleteError] = useState("");
   const [liffSaveLoading, setLiffSaveLoading] = useState(false);
-  /** liff.login 後の bfcache / 復帰で自動送信 effect を再実行する */
+  /** [DEBUG 単一路径] 自動再開無効化中 — 再有効化時は下の pageshow / auto-resume のコメントを外す */
   const [lineLoginResumeBump, setLineLoginResumeBump] = useState(0);
+  void lineLoginResumeBump;
+  void setLineLoginResumeBump;
 
   const progress = Math.round((currentQ / questions.length) * 100);
   const currentQuestion = questions[currentQ];
@@ -1632,6 +1663,7 @@ export default function App() {
     }
   }, [screen]);
 
+  /*
   useEffect(() => {
     const onPageShow = (e) => {
       if (e && e.persisted) {
@@ -1644,12 +1676,16 @@ export default function App() {
     }
     return undefined;
   }, []);
+  */
 
-  /**
+  /*
    * liff.login() 後のフルリロード等で復帰したとき:
    * liff.isLoggedIn() &&（pending または URL ?type= が finalResultKey と一致）→ handleComplete(finalResultKey) を自動実行。
    * finalResultKey は state の resultKey が空でも URL の type から復元する。
+   *
+   * [DEBUG 単一路径] 一時無効 — ボタン onClick → handleComplete のみで検証
    */
+  /*
   useEffect(() => {
     if (screen !== "result" || !REACT_APP_LIFF_ID) return undefined;
 
@@ -1660,7 +1696,6 @@ export default function App() {
     try {
       pendingRaw = typeof window !== "undefined" ? window.sessionStorage.getItem(PENDING_LINE_SEND_KEY) || "" : "";
     } catch (_) {
-      /* ignore */
     }
     const pending = normalizeTypeKey(pendingRaw);
     const urlType = normalizeTypeKey(typeFromUrl || "");
@@ -1705,7 +1740,8 @@ export default function App() {
         const liffMod = await import("@line/liff");
         const liff = liffMod.default;
         console.log("[auto-resume] liff.init start");
-        await liff.init({ liffId: REACT_APP_LIFF_ID, withLoginOnExternalBrowser: false });
+        await liff.init({ liffId: REACT_APP_LIFF_ID });
+        console.log("[auto-resume] liff.isInClient:", liff.isInClient());
         if (cancelled) return;
         console.log("[auto-resume] liff.isLoggedIn:", liff.isLoggedIn());
         if (!liff.isLoggedIn()) {
@@ -1718,7 +1754,6 @@ export default function App() {
         try {
           pendingRawNow = window.sessionStorage.getItem(PENDING_LINE_SEND_KEY) || "";
         } catch (_) {
-          /* ignore */
         }
         const pendingNow = normalizeTypeKey(pendingRawNow);
         const urlTypeNow = normalizeTypeKey(typeFromUrlNow || "");
@@ -1770,6 +1805,7 @@ export default function App() {
       cancelled = true;
     };
   }, [screen, resultKey, lineLoginResumeBump]);
+  */
 
   const RESULT_LINE_NEXT_COPY = `この先では、
 
@@ -1779,59 +1815,6 @@ export default function App() {
 
 をLINEでお届けします✨`;
 
-  /**
-   * 「LINEで続きを受け取る🩷」: 必ず先に handleComplete（/api/line/push-result）→ 成功後に LINE 公式へ遷移。
-   * 手動タップとログイン復帰用 effect の両方から handleComplete を呼ぶ。結果画面表示だけでは送信しない。
-   */
-  const handleLineContinueAfterResult = async (e) => {
-    if (e && typeof e.preventDefault === "function") e.preventDefault();
-    if (typeof window === "undefined") return;
-    if (screen !== "result") return;
-    const urlParams = new URLSearchParams(window.location.search || "");
-    const typeFromUrl = urlParams.get("type");
-    let pendingRaw = "";
-    try {
-      pendingRaw = window.sessionStorage.getItem(PENDING_LINE_SEND_KEY) || "";
-    } catch (_) {
-      /* ignore */
-    }
-    const finalResultKey = resolveFinalResultKey(resultKeyRef.current || resultKey, typeFromUrl, pendingRaw);
-    if (!finalResultKey) return;
-    if (liffSaveLoading || liffSaveInFlightRef.current) return;
-
-    if (liffMsgSentRef.current) {
-      await openLineOfficialAccountLink();
-      return;
-    }
-
-    liffSaveInFlightRef.current = true;
-    setLiffCompleteError("");
-    setLiffSaveLoading(true);
-    let sent = false;
-    try {
-      const out = await handleComplete(finalResultKey);
-      if (out.ok) {
-        liffMsgSentRef.current = true;
-        setLiffCompleteError("");
-        sent = true;
-      } else if (out.kind === "login_redirect") {
-        /* liff.login へ。送信はログイン後に同ボタンでもう一度 */
-      } else if (out.message) {
-        setLiffCompleteError(out.message);
-      }
-    } catch (err) {
-      console.warn("[handleComplete] error:", String(err));
-      setLiffCompleteError("送信処理でエラーが発生しました。もう一度ボタンからお試しください。");
-    } finally {
-      liffSaveInFlightRef.current = false;
-      setLiffSaveLoading(false);
-    }
-
-    if (!sent) return;
-
-    await openLineOfficialAccountLink();
-  };
-
   const renderLineContinueBlock = () => (
     <div className="result-line-next-wrap">
       <p className="result-line-next-copy">{RESULT_LINE_NEXT_COPY}</p>
@@ -1840,9 +1823,13 @@ export default function App() {
         role="button"
         className="result-line-next-btn"
         aria-disabled={liffSaveLoading}
-        onClick={(ev) => {
+        onClick={async (ev) => {
           ev.preventDefault();
-          void handleLineContinueAfterResult(ev);
+          console.log("CLICK FIRED");
+          const res = await handleComplete(resultKey);
+          if (res && res.ok) {
+            window.location.href = LINE_OFFICIAL_URL;
+          }
         }}
       >
         LINEで続きを受け取る🩷
