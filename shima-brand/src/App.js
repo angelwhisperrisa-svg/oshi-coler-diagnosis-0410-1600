@@ -1818,7 +1818,20 @@ export default function App() {
   const renderLineContinueBlock = () => (
     <div className="result-line-next-wrap">
       <p className="result-line-next-copy">{RESULT_LINE_NEXT_COPY}</p>
-      <button type="button" className="result-line-next-btn" disabled={liffSaveLoading} onClick={async (ev) => { ev.preventDefault(); console.log("CLICK FIRED"); const res = await handleComplete(resultKey); if (res && res.ok) { window.location.href = LINE_OFFICIAL_URL; } }}>LINEで続きを受け取る🩷</button>
+      <button
+        type="button"
+        className="result-line-next-btn"
+        disabled={liffSaveLoading}
+        onClick={async (ev) => {
+          ev.preventDefault();
+          await handleComplete(resultKey);
+          setTimeout(() => {
+            window.location.href = LINE_OFFICIAL_URL;
+          }, 300);
+        }}
+      >
+        LINEで続きを受け取る🩷
+      </button>
     </div>
   );
 
