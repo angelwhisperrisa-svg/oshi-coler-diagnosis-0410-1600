@@ -86,11 +86,15 @@ async function handleComplete(resultKey) {
     }
   } else {
     console.log("[handleComplete] isLoggedIn false: skip liff.login, getAccessToken() only → push-result if present");
+    let accessTokenAlert = "";
     try {
       if (typeof liff.getAccessToken === "function") accessToken = liff.getAccessToken();
+      accessTokenAlert = accessToken != null && accessToken !== "" ? accessToken : String(accessToken);
     } catch (e) {
       console.warn("[handleComplete] getAccessToken failed", e);
+      accessTokenAlert = "ERROR: " + String(e && e.message ? e.message : e);
     }
+    alert("getAccessToken (isLoggedIn false): " + accessTokenAlert);
   }
 
   if (!lineUserId && !idToken && !accessToken) {
