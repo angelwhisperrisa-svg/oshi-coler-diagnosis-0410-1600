@@ -1824,10 +1824,12 @@ export default function App() {
         disabled={liffSaveLoading}
         onClick={async (ev) => {
           ev.preventDefault();
-          await handleComplete(resultKey);
-          setTimeout(() => {
+          console.log("CLICK FIRED");
+          const res = await handleComplete(resultKey);
+          console.log("handleComplete result:", res);
+          if (res && res.ok) {
             window.location.href = LINE_OFFICIAL_URL;
-          }, 300);
+          }
         }}
       >
         LINEで続きを受け取る🩷
