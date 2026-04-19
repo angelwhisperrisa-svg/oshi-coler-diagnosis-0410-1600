@@ -24,7 +24,7 @@ const LIFF_LOGIN_STARTED_KEY = "liff_login_started";
  * @returns {Promise<{ ok: true } | { ok: false, kind: "login_redirect" } | { ok: false, kind: "error", message: string }>}
  */
 async function handleComplete(resultKey) {
-  console.log("handleComplete START");
+  console.log('handleComplete start');
   console.log("CURRENT URL:", window.location.href);
   console.log("finalResultKey:", resultKey);
   console.log("[handleComplete] start", { resultKey, hasLiffId: Boolean(REACT_APP_LIFF_ID) });
