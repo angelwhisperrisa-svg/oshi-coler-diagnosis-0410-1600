@@ -18,146 +18,167 @@ const PUBLIC_APP_ORIGIN = (
 
 const RESULT_TYPE_KEYS = ["mint", "rose", "lavender", "ivory", "skyblue"];
 const REACT_APP_LIFF_ID = process.env.REACT_APP_LIFF_ID || "";
-/** LIFF ログイン遷移後に push-result を再開するためのフラグ（値は resultKey） */
+/** liff.login 復帰後に送信する場合のみ `"true"` */
 const PENDING_LINE_SEND_KEY = "pendingLineSend";
-/** 同一セッションでの liff.login 多重起動防止（push 成功時に削除） */
+/** pending 時の診断キー（JSON: `{ resultKey }`） */
+const RESULT_DATA_STORAGE_KEY = "resultData";
 const LIFF_LOGIN_STARTED_KEY = "liff_login_started";
 
-/**
- * LINE アプリ内: init は withLoginOnExternalBrowser を付けない（UA で判定）。
- * liff.login は呼ばない。init 後 isLoggedIn が false なら getAccessToken() のみ試し、トークンがあれば push-result へ。
- * true のときは getProfile を優先し、失敗時のみ idToken / accessToken を試す。
- * @returns {Promise<{ ok: true } | { ok: false, kind: "error", message: string }>}
- */
-async function handleComplete(resultKey) {
-  alert("handleComplete内");
-  console.log('handleComplete start');
-  console.log("CURRENT URL:", window.location.href);
-  console.log("finalResultKey:", resultKey);
-  console.log("[handleComplete] start", { resultKey, hasLiffId: Boolean(REACT_APP_LIFF_ID) });
+function buildLiffInitOptions() {
+  const ua = typeof navigator !== "undefined" ? navigator.userAgent || "" : "";
+  const likelyLineInApp = /Line\//i.test(ua);
+  const initOpts = { liffId: REACT_APP_LIFF_ID };
+  if (!likelyLineInApp) initOpts.withLoginOnExternalBrowser = true;
+  return initOpts;
+}
 
+async function parsePushJson(response) {
+  const raw = await response.text();
+  try {
+    return { raw, data: JSON.parse(raw) };
+  } catch {
+    return { raw, data: {} };
+  }
+}
+
+/**
+ * LINE トークへ診断結果を送る。LIFF で sendMessages が使える場合はそれを使用。
+ * 使えない場合は /api/line/push-result（Messaging API）にフォールバック。
+ */
+async function pushResultToLine(resultKey) {
   if (!REACT_APP_LIFF_ID || !RESULT_TYPE_KEYS.includes(resultKey)) {
-    console.log("[handleComplete] return: invalid LIFF or resultKey");
-    return { ok: false, kind: "error", message: "診断結果の送信設定が無効です。" };
+    return { ok: false, message: "診断結果の送信設定が無効です。" };
   }
   let liff;
   try {
     liff = (await import("@line/liff")).default;
-    const ua = typeof navigator !== "undefined" ? navigator.userAgent || "" : "";
-    const likelyLineInApp = /Line\//i.test(ua);
-    const initOpts = { liffId: REACT_APP_LIFF_ID };
-    if (!likelyLineInApp) initOpts.withLoginOnExternalBrowser = true;
-    console.log("liff.init start", { likelyLineInApp, initOptsKeys: Object.keys(initOpts) });
-    await liff.init(initOpts);
-    console.log("liff.isLoggedIn:", liff.isLoggedIn());
-    console.log("liff.isInClient:", liff.isInClient());
+    await liff.init(buildLiffInitOptions());
   } catch (e) {
-    console.warn("[handleComplete] liff.init failed", e);
-    console.log("[handleComplete] return: liff.init failed");
-    return { ok: false, kind: "error", message: "LINE連携の初期化に失敗しました。しばらくしてから再度お試しください。" };
+    console.warn("[pushResultToLine] liff.init failed", e);
+    return { ok: false, message: "LINE連携の初期化に失敗しました。" };
   }
 
-  alert("liff.isLoggedIn(): " + String(liff.isLoggedIn()));
+  if (typeof liff.isLoggedIn === "function" && !liff.isLoggedIn()) {
+    return { ok: false, message: "ログインが必要です。" };
+  }
 
-  const loggedIn = typeof liff.isLoggedIn === "function" && liff.isLoggedIn();
+  const text = `診断結果：${resultKey}`;
+  try {
+    if (
+      typeof liff.sendMessages === "function" &&
+      typeof liff.isApiAvailable === "function" &&
+      liff.isApiAvailable("sendMessages")
+    ) {
+      await liff.sendMessages([{ type: "text", text }]);
+      console.log("[pushResultToLine] sendMessages ok", { resultKey });
+      return { ok: true };
+    }
+  } catch (e) {
+    console.warn("[pushResultToLine] sendMessages failed, try push-result API", e);
+  }
+
   let lineUserId = null;
   let idToken = null;
   let accessToken = null;
-
-  if (loggedIn) {
+  try {
+    const profile = await liff.getProfile();
+    lineUserId = profile?.userId || null;
+  } catch (e) {
+    console.warn("[pushResultToLine] getProfile failed", e);
+  }
+  if (!lineUserId) {
     try {
-      const profile = await liff.getProfile();
-      lineUserId = profile?.userId || null;
-      console.log("after getProfile", profile);
-    } catch (e) {
-      console.warn("[handleComplete] getProfile failed (continue with token if any)", e);
+      if (typeof liff.getIDToken === "function") idToken = liff.getIDToken();
+    } catch (_) {
+      /* ignore */
     }
-    if (!lineUserId) {
-      try {
-        if (typeof liff.getIDToken === "function") idToken = liff.getIDToken();
-      } catch (e) {
-        console.warn("[handleComplete] getIDToken failed", e);
-      }
-      try {
-        if (typeof liff.getAccessToken === "function") accessToken = liff.getAccessToken();
-      } catch (e) {
-        console.warn("[handleComplete] getAccessToken failed", e);
-      }
-    }
-  } else {
-    console.log("[handleComplete] isLoggedIn false: skip liff.login, getAccessToken() only → push-result if present");
-    let accessTokenAlert = "";
     try {
       if (typeof liff.getAccessToken === "function") accessToken = liff.getAccessToken();
-      accessTokenAlert = accessToken != null && accessToken !== "" ? accessToken : String(accessToken);
-    } catch (e) {
-      console.warn("[handleComplete] getAccessToken failed", e);
-      accessTokenAlert = "ERROR: " + String(e && e.message ? e.message : e);
+    } catch (_) {
+      /* ignore */
     }
-    alert("getAccessToken (isLoggedIn false): " + accessTokenAlert);
   }
 
   if (!lineUserId && !idToken && !accessToken) {
-    console.log("[handleComplete] return: no identity (profile / idToken / accessToken)");
-    return {
-      ok: false,
-      kind: "error",
-      message: "LINEのユーザー情報を取得できませんでした。LINEアプリから開き直してお試しください。"
-    };
+    return { ok: false, message: "LINEのユーザー情報を取得できませんでした。" };
   }
 
-  console.log("sending result:", resultKey, { hasLineUserId: Boolean(lineUserId), hasIdToken: Boolean(idToken), hasAccessToken: Boolean(accessToken) });
-
-  const origin = PUBLIC_APP_ORIGIN;
   const pushBody = { resultType: resultKey };
   if (lineUserId) pushBody.lineUserId = lineUserId;
   if (idToken) pushBody.idToken = idToken;
   if (accessToken) pushBody.accessToken = accessToken;
 
-  const parsePushJson = async (response) => {
-    const raw = await response.text();
-    try {
-      return { raw, data: JSON.parse(raw) };
-    } catch {
-      return { raw, data: {} };
-    }
-  };
-
   try {
-    console.log("calling push-result API");
-    const res = await fetch(`${origin}/api/line/push-result`, {
+    const res = await fetch(`${PUBLIC_APP_ORIGIN}/api/line/push-result`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(pushBody)
     });
-    console.log("push-result response:", res.status);
     const { data } = await parsePushJson(res);
     if (!res.ok || data.failure === true || data.success === false) {
-      console.warn("[handleComplete] push-result failure", res.status, data);
       const hint = typeof data.detail === "string" ? data.detail.slice(0, 120) : "";
-      console.log("[handleComplete] return: push-result failure", res.status);
       return {
         ok: false,
-        kind: "error",
         message: hint ? `結果の送信に失敗しました。（${hint}）` : "結果の送信に失敗しました。もう一度お試しください。"
       };
     }
   } catch (e) {
-    console.warn("[handleComplete] fetch failed", e);
-    console.log("[handleComplete] return: fetch exception");
-    return { ok: false, kind: "error", message: "通信エラーが発生しました。通信状況をご確認のうえ、再度お試しください。" };
+    console.warn("[pushResultToLine] fetch failed", e);
+    return { ok: false, message: "通信エラーが発生しました。通信状況をご確認のうえ、再度お試しください。" };
+  }
+  return { ok: true };
+}
+
+/**
+ * ログイン済みなら即 pushResultToLine。未ログインなら resultData + pendingLineSend を保存して liff.login。
+ * @returns {Promise<{ ok: true } | { ok: false, kind: "error" | "login_redirect", message: string }>}
+ */
+async function handleComplete(resultKey) {
+  console.log("[handleComplete] start", { resultKey, hasLiffId: Boolean(REACT_APP_LIFF_ID) });
+
+  if (!REACT_APP_LIFF_ID || !RESULT_TYPE_KEYS.includes(resultKey)) {
+    return { ok: false, kind: "error", message: "診断結果の送信設定が無効です。" };
+  }
+  let liff;
+  try {
+    liff = (await import("@line/liff")).default;
+    await liff.init(buildLiffInitOptions());
+  } catch (e) {
+    console.warn("[handleComplete] liff.init failed", e);
+    return { ok: false, kind: "error", message: "LINE連携の初期化に失敗しました。しばらくしてから再度お試しください。" };
+  }
+
+  if (typeof liff.isLoggedIn === "function" && liff.isLoggedIn()) {
+    const out = await pushResultToLine(resultKey);
+    if (!out.ok) {
+      return { ok: false, kind: "error", message: out.message || "送信に失敗しました。" };
+    }
+    try {
+      if (typeof window !== "undefined") {
+        window.sessionStorage.removeItem(PENDING_LINE_SEND_KEY);
+        window.sessionStorage.removeItem(RESULT_DATA_STORAGE_KEY);
+        window.sessionStorage.removeItem(LIFF_LOGIN_STARTED_KEY);
+      }
+    } catch (_) {
+      /* ignore */
+    }
+    return { ok: true };
   }
 
   try {
     if (typeof window !== "undefined") {
-      window.sessionStorage.removeItem(PENDING_LINE_SEND_KEY);
-      window.sessionStorage.removeItem(LIFF_LOGIN_STARTED_KEY);
+      window.sessionStorage.setItem(RESULT_DATA_STORAGE_KEY, JSON.stringify({ resultKey }));
+      window.sessionStorage.setItem(PENDING_LINE_SEND_KEY, "true");
     }
-  } catch (_) {
-    /* ignore */
+  } catch (e) {
+    console.warn("[handleComplete] sessionStorage write failed", e);
+    return { ok: false, kind: "error", message: "ブラウザの保存領域への書き込みに失敗しました。" };
   }
-  console.log("[handleComplete] return: ok true");
-  return { ok: true };
+
+  const redirectUri = typeof window !== "undefined" ? window.location.href : "";
+  console.log("[handleComplete] not logged in → liff.login", { redirectUri });
+  liff.login({ redirectUri });
+  return { ok: false, kind: "login_redirect", message: "LINEでログイン完了後に結果を送信します。" };
 }
 
 /**
@@ -1474,7 +1495,18 @@ export default function App() {
     } else if (typeof window !== "undefined") {
       let pendingType = null;
       try {
-        pendingType = normalizeTypeKey(window.sessionStorage.getItem(PENDING_LINE_SEND_KEY) || "");
+        const rawPending = window.sessionStorage.getItem(PENDING_LINE_SEND_KEY) || "";
+        if (rawPending === "true") {
+          const rawData = window.sessionStorage.getItem(RESULT_DATA_STORAGE_KEY) || "";
+          try {
+            const parsed = rawData ? JSON.parse(rawData) : null;
+            pendingType = normalizeTypeKey(parsed?.resultKey || "");
+          } catch (_) {
+            pendingType = null;
+          }
+        } else {
+          pendingType = normalizeTypeKey(rawPending);
+        }
       } catch (_) {
         /* ignore */
       }
@@ -1598,7 +1630,10 @@ export default function App() {
     setLiffSaveLoading(false);
     liffSaveInFlightRef.current = false;
     try {
-      if (typeof window !== "undefined") window.sessionStorage.removeItem(PENDING_LINE_SEND_KEY);
+      if (typeof window !== "undefined") {
+        window.sessionStorage.removeItem(PENDING_LINE_SEND_KEY);
+        window.sessionStorage.removeItem(RESULT_DATA_STORAGE_KEY);
+      }
     } catch (_) {
       /* ignore */
     }
@@ -1638,7 +1673,10 @@ export default function App() {
     setLiffSaveLoading(false);
     liffSaveInFlightRef.current = false;
     try {
-      if (typeof window !== "undefined") window.sessionStorage.removeItem(PENDING_LINE_SEND_KEY);
+      if (typeof window !== "undefined") {
+        window.sessionStorage.removeItem(PENDING_LINE_SEND_KEY);
+        window.sessionStorage.removeItem(RESULT_DATA_STORAGE_KEY);
+      }
     } catch (_) {
       /* ignore */
     }
@@ -1669,7 +1707,6 @@ export default function App() {
     }
   }, [screen]);
 
-  /*
   useEffect(() => {
     const onPageShow = (e) => {
       if (e && e.persisted) {
@@ -1682,123 +1719,75 @@ export default function App() {
     }
     return undefined;
   }, []);
-  */
 
-  /*
-   * liff.login() 後のフルリロード等で復帰したとき:
-   * liff.isLoggedIn() &&（pending または URL ?type= が finalResultKey と一致）→ handleComplete(finalResultKey) を自動実行。
-   * finalResultKey は state の resultKey が空でも URL の type から復元する。
-   *
-   * [DEBUG 単一路径] 一時無効 — ボタン onClick → handleComplete のみで検証
-   */
-  /*
+  /** sessionStorage の pendingLineSend === "true" のときのみ pushResultToLine を実行し、完了後に必ず削除 */
   useEffect(() => {
     if (screen !== "result" || !REACT_APP_LIFF_ID) return undefined;
 
-    const urlParams = new URLSearchParams(typeof window !== "undefined" ? window.location.search || "" : "");
-    const typeFromUrl = urlParams.get("type");
-
-    let pendingRaw = "";
+    let storedKey = "";
     try {
-      pendingRaw = typeof window !== "undefined" ? window.sessionStorage.getItem(PENDING_LINE_SEND_KEY) || "" : "";
+      if (typeof window === "undefined") return undefined;
+      if (window.sessionStorage.getItem(PENDING_LINE_SEND_KEY) !== "true") return undefined;
+      const raw = window.sessionStorage.getItem(RESULT_DATA_STORAGE_KEY) || "";
+      const parsed = raw ? JSON.parse(raw) : null;
+      storedKey = normalizeTypeKey(parsed?.resultKey || "");
     } catch (_) {
-    }
-    const pending = normalizeTypeKey(pendingRaw);
-    const urlType = normalizeTypeKey(typeFromUrl || "");
-
-    const finalResultKey = resolveFinalResultKey(resultKeyRef.current || resultKey, typeFromUrl, pendingRaw);
-    if (!finalResultKey) return undefined;
-
-    const pendingOk = Boolean(pending && pending === finalResultKey);
-    const urlOk = Boolean(urlType && urlType === finalResultKey);
-    if (!pendingOk && !urlOk) {
-      console.log("[auto-resume handleComplete] skip: pending/URL type どちらも条件不一致", {
-        pending,
-        urlType,
-        finalResultKey,
-        typeFromUrl
-      });
       return undefined;
     }
+    if (!storedKey || !RESULT_TYPE_KEYS.includes(storedKey)) return undefined;
 
-    if (liffMsgSentRef.current) {
-      console.log("[auto-resume handleComplete] skip: already sent");
-      return undefined;
-    }
-    if (liffSaveInFlightRef.current) {
-      console.log("[auto-resume handleComplete] skip: save in flight");
-      return undefined;
-    }
+    if (liffMsgSentRef.current || liffSaveInFlightRef.current) return undefined;
 
-    console.log("[auto-resume handleComplete] schedule", {
-      finalResultKey,
-      pendingOk,
-      urlOk,
-      href: typeof window !== "undefined" ? window.location.href : ""
-    });
+    console.log("[pendingLineSend resume] schedule pushResultToLine", { storedKey });
 
     let cancelled = false;
     (async () => {
       try {
+        const liffMod = await import("@line/liff");
+        const liffPre = liffMod.default;
+        await liffPre.init(buildLiffInitOptions());
+        if (cancelled) return;
+        if (typeof window !== "undefined" && window.sessionStorage.getItem(PENDING_LINE_SEND_KEY) !== "true") {
+          return;
+        }
+        if (typeof liffPre.isLoggedIn === "function" && !liffPre.isLoggedIn()) {
+          console.log("[pendingLineSend resume] skip: not logged in yet (login遷移中)");
+          return;
+        }
         liffSaveInFlightRef.current = true;
         setLiffSaveLoading(true);
         setLiffCompleteError("");
-        const liffMod = await import("@line/liff");
-        const liff = liffMod.default;
-        console.log("[auto-resume] liff.init start");
-        await liff.init({ liffId: REACT_APP_LIFF_ID });
-        console.log("[auto-resume] liff.isInClient:", liff.isInClient());
-        if (cancelled) return;
-        console.log("[auto-resume] liff.isLoggedIn:", liff.isLoggedIn());
-        if (!liff.isLoggedIn()) {
-          console.log("[auto-resume handleComplete] abort: not logged in after init");
-          return;
-        }
-        const urlParamsNow = new URLSearchParams(window.location.search || "");
-        const typeFromUrlNow = urlParamsNow.get("type");
-        let pendingRawNow = "";
-        try {
-          pendingRawNow = window.sessionStorage.getItem(PENDING_LINE_SEND_KEY) || "";
-        } catch (_) {
-        }
-        const pendingNow = normalizeTypeKey(pendingRawNow);
-        const urlTypeNow = normalizeTypeKey(typeFromUrlNow || "");
-        const finalResultKeyNow = resolveFinalResultKey(resultKeyRef.current || resultKey, typeFromUrlNow, pendingRawNow);
-        if (!finalResultKeyNow) {
-          console.log("[auto-resume handleComplete] abort: finalResultKey が取得できない", {
-            typeFromUrlNow,
-            resultKeyRef: resultKeyRef.current,
-            resultKey
-          });
-          return;
-        }
-        const stillPendingOk = Boolean(pendingNow && pendingNow === finalResultKeyNow);
-        const stillUrlOk = Boolean(urlTypeNow && urlTypeNow === finalResultKeyNow);
-        if (!stillPendingOk && !stillUrlOk) {
-          console.log("[auto-resume handleComplete] abort: pending/URL 条件が init 後に失効", {
-            pendingNow,
-            urlTypeNow,
-            finalResultKeyNow
-          });
-          return;
-        }
-        console.log("[auto-resume handleComplete] calling handleComplete", finalResultKeyNow);
-        const out = await handleComplete(finalResultKeyNow);
-        console.log("[auto-resume handleComplete] handleComplete returned", out);
+        const out = await pushResultToLine(storedKey);
         if (cancelled) return;
         if (out.ok) {
           liffMsgSentRef.current = true;
           setLiffCompleteError("");
-          await openLineOfficialAccountLink();
-        } else if (out.kind === "login_redirect") {
-          console.log("[auto-resume handleComplete] still login_redirect (unexpected here)");
-        } else if (out.message) {
-          setLiffCompleteError(out.message);
+          try {
+            window.sessionStorage.removeItem(PENDING_LINE_SEND_KEY);
+            window.sessionStorage.removeItem(RESULT_DATA_STORAGE_KEY);
+            window.sessionStorage.removeItem(LIFF_LOGIN_STARTED_KEY);
+          } catch (_) {
+            /* ignore */
+          }
+        } else {
+          setLiffCompleteError(out.message || "送信に失敗しました。");
+          try {
+            window.sessionStorage.removeItem(PENDING_LINE_SEND_KEY);
+            window.sessionStorage.removeItem(RESULT_DATA_STORAGE_KEY);
+          } catch (_) {
+            /* ignore */
+          }
         }
       } catch (e) {
-        console.warn("[auto-resume handleComplete] catch", e);
+        console.warn("[pendingLineSend resume] catch", e);
         if (!cancelled) {
           setLiffCompleteError("送信処理でエラーが発生しました。もう一度ボタンからお試しください。");
+          try {
+            window.sessionStorage.removeItem(PENDING_LINE_SEND_KEY);
+            window.sessionStorage.removeItem(RESULT_DATA_STORAGE_KEY);
+          } catch (_) {
+            /* ignore */
+          }
         }
       } finally {
         if (!cancelled) {
@@ -1811,7 +1800,6 @@ export default function App() {
       cancelled = true;
     };
   }, [screen, resultKey, lineLoginResumeBump]);
-  */
 
   const RESULT_LINE_NEXT_COPY = `この先では、
 
@@ -1833,7 +1821,11 @@ export default function App() {
           console.log("CLICK OK");
           const res = await handleComplete(resultKey);
           console.log("RESULT:", res);
-          return; // ここで止める
+          if (res && res.ok) {
+            window.location.href = LINE_OFFICIAL_URL;
+          } else if (res && res.kind === "error" && res.message) {
+            setLiffCompleteError(res.message);
+          }
         }}
       >
         LINEで続きを受け取る🩷
