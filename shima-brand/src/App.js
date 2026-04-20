@@ -24,18 +24,50 @@ const PENDING_LINE_SEND_KEY = "pendingLineSend";
 const RESULT_DATA_STORAGE_KEY = "resultData";
 /** 二重送信防止（pushResultToLine 実行中） */
 const SEND_LOCK_KEY = "SEND_LOCK";
-const LIFF_LOGIN_STARTED_KEY = "liff_login_started";
+/** ログイン遷移→復帰検知用（load / pageshow で先に削除してループ防止） */
+const LIFF_LOGIN_STARTED_KEY = "LIFF_LOGIN_STARTED";
+
+/** §6: 送信終了時は resultData / pendingLineSend / SEND_LOCK のみ削除 */
+function clearAfterLineSend() {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.removeItem(RESULT_DATA_STORAGE_KEY);
+    window.sessionStorage.removeItem(PENDING_LINE_SEND_KEY);
+    window.sessionStorage.removeItem(SEND_LOCK_KEY);
+  } catch (_) {
+    /* ignore */
+  }
+}
 
 function clearLineSendSessionStorage() {
   if (typeof window === "undefined") return;
   try {
-    window.sessionStorage.removeItem(SEND_LOCK_KEY);
-    window.sessionStorage.removeItem(PENDING_LINE_SEND_KEY);
-    window.sessionStorage.removeItem(RESULT_DATA_STORAGE_KEY);
+    clearAfterLineSend();
     window.sessionStorage.removeItem(LIFF_LOGIN_STARTED_KEY);
+    window.sessionStorage.removeItem("liff_login_started");
   } catch (_) {
     /* ignore */
   }
+}
+
+/** §4: 復帰時に LIFF_LOGIN_STARTED があれば先に削除（login 直後の誤発火抑止） */
+function consumeLiffLoginReturnedFlag() {
+  if (typeof window === "undefined") return false;
+  try {
+    let removed = false;
+    if (window.sessionStorage.getItem(LIFF_LOGIN_STARTED_KEY)) {
+      window.sessionStorage.removeItem(LIFF_LOGIN_STARTED_KEY);
+      removed = true;
+    }
+    if (window.sessionStorage.getItem("liff_login_started")) {
+      window.sessionStorage.removeItem("liff_login_started");
+      removed = true;
+    }
+    return removed;
+  } catch (_) {
+    /* ignore */
+  }
+  return false;
 }
 
 function buildLiffInitOptions() {
@@ -57,7 +89,8 @@ async function parsePushJson(response) {
 
 /**
  * LINE トークへ診断結果を送る（SEND_LOCK で二重送信防止）。
- * sendMessages 可なら使用。不可なら /api/line/push-result。終了時に pending / resultData / SEND_LOCK を必ず削除。
+ * sendMessages 可なら使用。不可なら /api/line/push-result。
+ * §6: 成功・失敗に関わらず resultData / pendingLineSend / SEND_LOCK のみ削除。
  */
 async function pushResultToLine(resultKey) {
   if (!REACT_APP_LIFF_ID || !RESULT_TYPE_KEYS.includes(resultKey)) {
@@ -160,13 +193,13 @@ async function pushResultToLine(resultKey) {
     out = { ok: true, message: "" };
     return out;
   } finally {
-    clearLineSendSessionStorage();
+    clearAfterLineSend();
   }
 }
 
 /**
  * onComplete 相当: ログイン済みなら即 pushResultToLine（SEND_LOCK・クリーンアップ込み）。
- * 未ログインなら resultData + pendingLineSend=true を保存して liff.login（復帰は load / useEffect）。
+ * 未ログインなら resultData + pendingLineSend=true + LIFF_LOGIN_STARTED=true を保存して liff.login。
  */
 async function handleComplete(resultKey) {
   console.log("[handleComplete] start", { resultKey, hasLiffId: Boolean(REACT_APP_LIFF_ID) });
@@ -195,6 +228,7 @@ async function handleComplete(resultKey) {
     if (typeof window !== "undefined") {
       window.sessionStorage.setItem(RESULT_DATA_STORAGE_KEY, JSON.stringify({ resultKey }));
       window.sessionStorage.setItem(PENDING_LINE_SEND_KEY, "true");
+      window.sessionStorage.setItem(LIFF_LOGIN_STARTED_KEY, "true");
     }
   } catch (e) {
     console.warn("[handleComplete] sessionStorage write failed", e);
@@ -1721,7 +1755,8 @@ export default function App() {
 
   useEffect(() => {
     const onPageShow = (e) => {
-      if (e && e.persisted) {
+      const consumed = consumeLiffLoginReturnedFlag();
+      if ((e && e.persisted) || consumed) {
         setLineLoginResumeBump((n) => n + 1);
       }
     };
@@ -1732,9 +1767,10 @@ export default function App() {
     return undefined;
   }, []);
 
-  /** 設計どおり window load 後にログイン復帰チェック（LIFF リダイレクト完了後） */
+  /** §4: load 時に LIFF_LOGIN_STARTED を削除してから復帰チェック（bump） */
   useEffect(() => {
     const onLoad = () => {
+      consumeLiffLoginReturnedFlag();
       setLineLoginResumeBump((n) => n + 1);
     };
     if (typeof window === "undefined") return undefined;
