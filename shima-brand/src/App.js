@@ -9,7 +9,7 @@ const VIDEO = {
 const INTRO_DIAGNOSIS_MS = 15000;
 /** 無音のまま welcome 動画が終わったあと、中間表示へ進むまでの待ち時間 */
 const WELCOME_MUTED_END_DELAY_MS = 7000;
-const LINE_OFFICIAL_URL = "https://line.me/R/ti/p/@877xrsvw";
+const LINE_OFFICIAL_URL = "https://liff.line.me/2009787218-kjVGGHUD";
 const BASE_FULL_URL = process.env.REACT_APP_BASE_FULL_URL || "https://thebase.in/";
 /** /api 呼び出し先（別 Vercel ドメインで開いても shima-brand 側の Functions を叩く） */
 const PUBLIC_APP_ORIGIN = (
