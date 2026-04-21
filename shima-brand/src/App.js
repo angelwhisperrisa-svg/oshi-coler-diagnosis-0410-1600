@@ -9,15 +9,8 @@ const VIDEO = {
 const INTRO_DIAGNOSIS_MS = 15000;
 /** 無音のまま welcome 動画が終わったあと、中間表示へ進むまでの待ち時間 */
 const WELCOME_MUTED_END_DELAY_MS = 7000;
-const LINE_OFFICIAL_URL = "https://liff.line.me/2009787218-kjVGGHUD";
-const LINE_QR_IMAGE_URL =
-  process.env.REACT_APP_LINE_QR_IMAGE_URL ||
-  `https://quickchart.io/qr?text=${encodeURIComponent(LINE_OFFICIAL_URL)}&size=280`;
+const LINE_OFFICIAL_URL = "https://line.me/R/ti/p/@877xrsvw";
 const BASE_FULL_URL = process.env.REACT_APP_BASE_FULL_URL || "https://thebase.in/";
-/** /api 呼び出し先（別 Vercel ドメインで開いても shima-brand 側の Functions を叩く） */
-const PUBLIC_APP_ORIGIN = (
-  process.env.REACT_APP_PUBLIC_APP_ORIGIN || "https://shima-brand.vercel.app"
-).replace(/\/$/, "");
 
 const RESULT_TYPE_KEYS = ["mint", "rose", "lavender", "ivory", "skyblue"];
 const REACT_APP_LIFF_ID = process.env.REACT_APP_LIFF_ID || "";
@@ -27,14 +20,11 @@ const PENDING_LINE_SEND_KEY = "pendingLineSend";
 const LIFF_LOGIN_STARTED_KEY = "liff_login_started";
 
 /**
- * LINE アプリ内: init は withLoginOnExternalBrowser を付けない（UA で判定）。
- * liff.login は呼ばない。init 後 isLoggedIn が false なら getAccessToken() のみ試し、トークンがあれば push-result へ。
- * true のときは getProfile を優先し、失敗時のみ idToken / accessToken を試す。
- * @returns {Promise<{ ok: true } | { ok: false, kind: "error", message: string }>}
+ * 未ログイン時は liff.login({ redirectUri }) のみ（現在の URL＝/result?type=… を維持）。ログイン後に getProfile → /api/line/push-result。
+ * @returns {Promise<{ ok: true } | { ok: false, kind: "login_redirect" } | { ok: false, kind: "error", message: string }>}
  */
 async function handleComplete(resultKey) {
-  alert("handleComplete内");
-  console.log('handleComplete start');
+  console.log("handleComplete START");
   console.log("CURRENT URL:", window.location.href);
   console.log("finalResultKey:", resultKey);
   console.log("[handleComplete] start", { resultKey, hasLiffId: Boolean(REACT_APP_LIFF_ID) });
@@ -46,12 +36,8 @@ async function handleComplete(resultKey) {
   let liff;
   try {
     liff = (await import("@line/liff")).default;
-    const ua = typeof navigator !== "undefined" ? navigator.userAgent || "" : "";
-    const likelyLineInApp = /Line\//i.test(ua);
-    const initOpts = { liffId: REACT_APP_LIFF_ID };
-    if (!likelyLineInApp) initOpts.withLoginOnExternalBrowser = true;
-    console.log("liff.init start", { likelyLineInApp, initOptsKeys: Object.keys(initOpts) });
-    await liff.init(initOpts);
+    console.log("liff.init start");
+    await liff.init({ liffId: REACT_APP_LIFF_ID });
     console.log("liff.isLoggedIn:", liff.isLoggedIn());
     console.log("liff.isInClient:", liff.isInClient());
   } catch (e) {
@@ -60,62 +46,67 @@ async function handleComplete(resultKey) {
     return { ok: false, kind: "error", message: "LINE連携の初期化に失敗しました。しばらくしてから再度お試しください。" };
   }
 
-  alert("liff.isLoggedIn(): " + String(liff.isLoggedIn()));
-
-  const loggedIn = typeof liff.isLoggedIn === "function" && liff.isLoggedIn();
-  let lineUserId = null;
-  let idToken = null;
-  let accessToken = null;
-
-  if (loggedIn) {
+  if (!liff.isLoggedIn()) {
     try {
-      const profile = await liff.getProfile();
-      lineUserId = profile?.userId || null;
-      console.log("after getProfile", profile);
-    } catch (e) {
-      console.warn("[handleComplete] getProfile failed (continue with token if any)", e);
+      if (typeof window !== "undefined") window.sessionStorage.setItem(PENDING_LINE_SEND_KEY, resultKey);
+    } catch (_) {
+      /* ignore */
     }
-    if (!lineUserId) {
-      try {
-        if (typeof liff.getIDToken === "function") idToken = liff.getIDToken();
-      } catch (e) {
-        console.warn("[handleComplete] getIDToken failed", e);
-      }
-      try {
-        if (typeof liff.getAccessToken === "function") accessToken = liff.getAccessToken();
-      } catch (e) {
-        console.warn("[handleComplete] getAccessToken failed", e);
-      }
-    }
-  } else {
-    console.log("[handleComplete] isLoggedIn false: skip liff.login, getAccessToken() only → push-result if present");
-    let accessTokenAlert = "";
     try {
-      if (typeof liff.getAccessToken === "function") accessToken = liff.getAccessToken();
-      accessTokenAlert = accessToken != null && accessToken !== "" ? accessToken : String(accessToken);
+      const readBack = typeof window !== "undefined" ? window.sessionStorage.getItem(PENDING_LINE_SEND_KEY) : "";
+      console.log("[handleComplete] PENDING_LINE_SEND_KEY write/read", { wrote: resultKey, readBack });
     } catch (e) {
-      console.warn("[handleComplete] getAccessToken failed", e);
-      accessTokenAlert = "ERROR: " + String(e && e.message ? e.message : e);
+      console.log("[handleComplete] PENDING_LINE_SEND_KEY readBack error", e);
     }
-    alert("getAccessToken (isLoggedIn false): " + accessTokenAlert);
+    let loginAlreadyStarted = false;
+    try {
+      loginAlreadyStarted =
+        typeof window !== "undefined" && Boolean(window.sessionStorage.getItem(LIFF_LOGIN_STARTED_KEY));
+    } catch (_) {
+      /* ignore */
+    }
+    if (loginAlreadyStarted) {
+      console.log("[handleComplete] skip liff.login: liff_login_started already set");
+      return {
+        ok: false,
+        kind: "error",
+        message: "ログイン処理が既に開始されています。LINEアプリで開き直すか、しばらく待ってから再度お試しください。"
+      };
+    }
+    try {
+      if (typeof window !== "undefined") window.sessionStorage.setItem(LIFF_LOGIN_STARTED_KEY, "1");
+    } catch (_) {
+      /* ignore */
+    }
+    const redirectUri = typeof window !== "undefined" ? window.location.href : "";
+    console.log("[handleComplete] liff.login redirectUri:", redirectUri);
+    console.log("before liff.login");
+    liff.login({ redirectUri });
+    console.log("[handleComplete] return: login_redirect (liff.login with redirectUri)");
+    return { ok: false, kind: "login_redirect" };
   }
 
-  if (!lineUserId && !idToken && !accessToken) {
-    console.log("[handleComplete] return: no identity (profile / idToken / accessToken)");
-    return {
-      ok: false,
-      kind: "error",
-      message: "LINEのユーザー情報を取得できませんでした。LINEアプリから開き直してお試しください。"
-    };
+  let profile;
+  try {
+    profile = await liff.getProfile();
+    console.log("after getProfile", profile);
+  } catch (e) {
+    console.warn("[handleComplete] getProfile failed", e);
+    console.log("[handleComplete] return: getProfile failed");
+    return { ok: false, kind: "error", message: "LINEのユーザー情報を取得できませんでした。LINEアプリから開き直してお試しください。" };
+  }
+  console.log("profile result:", profile);
+
+  const lineUserId = profile?.userId || null;
+  if (!lineUserId) {
+    console.log("[handleComplete] return: empty profile.userId");
+    return { ok: false, kind: "error", message: "ユーザーIDを取得できませんでした。LINEアプリから開き直してお試しください。" };
   }
 
-  console.log("sending result:", resultKey, { hasLineUserId: Boolean(lineUserId), hasIdToken: Boolean(idToken), hasAccessToken: Boolean(accessToken) });
+  console.log("sending result:", resultKey);
 
-  const origin = PUBLIC_APP_ORIGIN;
-  const pushBody = { resultType: resultKey };
-  if (lineUserId) pushBody.lineUserId = lineUserId;
-  if (idToken) pushBody.idToken = idToken;
-  if (accessToken) pushBody.accessToken = accessToken;
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const pushBody = { lineUserId, resultType: resultKey };
 
   const parsePushJson = async (response) => {
     const raw = await response.text();
@@ -790,39 +781,6 @@ const styles = `
     text-decoration: none;
     text-align: center;
     box-sizing: border-box;
-  }
-  .line-qr-wrap {
-    margin-top: 12px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-  }
-  .line-qr-img {
-    width: min(58vw, 170px);
-    height: auto;
-    border-radius: 12px;
-    background: #fff;
-    border: 1px solid rgba(0, 0, 0, 0.08);
-    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.08);
-  }
-  .line-qr-note {
-    margin: 0;
-    color: #777;
-    font-size: 12px;
-    line-height: 1.4;
-  }
-  .line-qr-page {
-    text-align: center;
-  }
-  .line-qr-page .line-qr-img {
-    width: min(72vw, 240px);
-  }
-  .line-qr-back {
-    margin-top: 12px;
-    width: 100%;
-    justify-content: center;
-    text-align: center;
   }
   .floating-note { margin-top: 2px; color: #999; font-size: 12px; }
   .start-screen .diagnosis-quiz-start {
@@ -1864,12 +1822,12 @@ export default function App() {
         type="button"
         className="result-line-next-btn"
         disabled={liffSaveLoading}
-        onClick={async (e) => {
-          e.preventDefault();
-          console.log("CLICK OK");
-          const res = await handleComplete(resultKey);
-          console.log("RESULT:", res);
-          return; // ここで止める
+        onClick={async (ev) => {
+          ev.preventDefault();
+          await handleComplete(resultKey);
+          setTimeout(() => {
+            window.location.href = LINE_OFFICIAL_URL;
+          }, 300);
         }}
       >
         LINEで続きを受け取る🩷
@@ -2050,25 +2008,7 @@ export default function App() {
               <p className="start-text">
                 公式LINEを友だち追加すると、お送りするリンクから推し色診断（全7問）へ進めます。まずはLINEへどうぞ。
               </p>
-              <button type="button" className="start-btn" onClick={() => setScreen("lineQr")}>
-                LINE登録して診断を始める✨
-              </button>
-            </section>
-          )}
-
-          {screen === "lineQr" && (
-            <section className="card line-qr-page">
-              <p className="start-text">LINE登録は下のQRコードを読み取って進んでください。</p>
-              <div className="line-qr-wrap">
-                <img className="line-qr-img" src={LINE_QR_IMAGE_URL} alt="LINE登録用QRコード" />
-                <p className="line-qr-note">読み取れない場合は下のボタンから開けます</p>
-              </div>
-              <a className="start-btn" href={LINE_OFFICIAL_URL}>
-                LINEを開く
-              </a>
-              <button type="button" className="choice-btn line-qr-back" onClick={() => setScreen("start")}>
-                戻る
-              </button>
+              <a className="start-btn" href={LINE_OFFICIAL_URL}>LINE登録して診断を始める✨</a>
             </section>
           )}
 
