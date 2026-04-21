@@ -1,10 +1,11 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import liff from "@line/liff";
+import { LineOfficialFriendBlock } from "./lineOfficialFriendBlock";
 import {
   VIDEO,
   INTRO_DIAGNOSIS_MS,
   WELCOME_MUTED_END_DELAY_MS,
-  LINE_OFFICIAL_URL,
   PENDING_LINE_SEND_KEY,
   LIFF_LOGIN_STARTED_KEY,
   questions,
@@ -14,17 +15,14 @@ import {
   butterflies,
   petalLanes,
   butterflyLanes,
-  handleComplete,
-  openLineOfficialAccountLink,
   readStoredOshiType,
   clearStoredOshiType,
   writeStoredOshiType,
   normalizeTypeKey,
-  resolveFinalResultKey,
   computeResultFromScores,
   getBaseShopUrlForType,
   parseResultRoute,
-  REACT_APP_LIFF_ID
+  LINE_GATE_SESSION_KEY
 } from "./diagnosisShared";
 
 const QUESTION_ENTRY_STEP_PARAM = "step";
@@ -56,6 +54,7 @@ export function RouteRedirects() {
     const known =
       path === "/" ||
       path === "/start" ||
+      path === "/line" ||
       path === "/question" ||
       path === "/result" ||
       path.endsWith("/result");
@@ -67,14 +66,14 @@ export function RouteRedirects() {
     const params = new URLSearchParams(search);
     const typeQ = normalizeTypeKey(params.get("type"));
 
-    if (typeQ && path !== "/result" && !path.endsWith("/result") && path !== "/start") {
+    if (typeQ && path !== "/result" && !path.endsWith("/result") && path !== "/start" && path !== "/line") {
       const modeStr = (params.get("mode") || "free").toLowerCase() === "full" ? "full" : "free";
       navigate(`/result?type=${encodeURIComponent(typeQ)}&mode=${modeStr}`, { replace: true });
       return;
     }
 
     if ((path === "/" || path === "/start") && (params.get("entry") === "diagnosis" || params.get("start") === "1")) {
-      navigate("/question", { replace: true });
+      navigate("/line", { replace: true });
       return;
     }
 
@@ -109,7 +108,7 @@ export function RouteRedirects() {
     }
 
     if (path === "/" || path === "/start") {
-      if (prevKey && (prevKey.startsWith("/question") || prevKey.startsWith("/result"))) {
+      if (prevKey && (prevKey.startsWith("/question") || prevKey.startsWith("/line") || prevKey.startsWith("/result"))) {
         deepLinkConsumedRef.current = false;
       }
       if (!deepLinkConsumedRef.current) {
@@ -129,6 +128,85 @@ export function RouteRedirects() {
   }, [location.pathname, location.search, navigate]);
 
   return null;
+}
+
+/** /line：友だち追加 QR のみ → 診断へ（/question はゲート必須） */
+export function LinePage() {
+  const navigate = useNavigate();
+
+  useLayoutEffect(() => {
+    try {
+      if (typeof window !== "undefined") {
+        window.sessionStorage.removeItem(LINE_GATE_SESSION_KEY);
+      }
+    } catch (_) {
+      /* ignore */
+    }
+  }, []);
+
+  const goQuestion = () => {
+    try {
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(LINE_GATE_SESSION_KEY, "1");
+      }
+    } catch (_) {
+      /* ignore */
+    }
+    navigate("/question", { replace: true });
+  };
+  return (
+    <div className="page">
+      <div className="float-layer-back">
+        {petals.map((p, idx) => (
+          <span
+            key={`lp-${idx}`}
+            className="float-item petal"
+            style={{
+              left: `${petalLanes[idx % petalLanes.length]}%`,
+              animationDuration: `${11 + idx * 1.8}s`,
+              animationDelay: `${idx * 1.1}s`,
+              opacity: 0.17,
+              transform: "scale(0.92)"
+            }}
+          >
+            {p}
+          </span>
+        ))}
+        {butterflies.map((b, idx) => (
+          <span
+            key={`lb-${idx}`}
+            className="float-item butterfly"
+            style={{
+              left: `${butterflyLanes[idx % butterflyLanes.length]}%`,
+              top: `${idx % 2 === 0 ? 10 : 78}%`,
+              animationDuration: `${8 + idx * 2.2}s`,
+              animationDelay: `${idx * 1.4}s`,
+              opacity: 0.15,
+              transform: "scale(0.9)"
+            }}
+          >
+            {b}
+          </span>
+        ))}
+      </div>
+      <main className="container">
+        <header className="header">
+          <div className="sub">✦ Color Diagnosis ✦</div>
+          <h1 className="title">推し活💜推し色占い</h1>
+          <p className="desc">公式LINEの友だち追加のうえ、診断へお進みください。</p>
+        </header>
+        <section className="card start-screen">
+          <LineOfficialFriendBlock />
+          <button type="button" className="choice-btn diagnosis-quiz-start line-page-start-btn" onClick={goQuestion}>
+            <span className="choice-icon" aria-hidden>
+              ✨
+            </span>
+            <span>診断を始める</span>
+          </button>
+        </section>
+      </main>
+    </div>
+  );
 }
 
 /** / と /start：女神〜診断前カードのみ */
@@ -229,7 +307,7 @@ export function GoddessPage() {
     } catch (_) {
       /* ignore */
     }
-    navigate("/question");
+    navigate("/line");
   };
 
   return (
@@ -320,9 +398,9 @@ export function GoddessPage() {
                 <p className="start-text">
                   公式LINEを友だち追加すると、お送りするリンクから推し色診断（全7問）へ進めます。まずはLINEへどうぞ。
                 </p>
-                <a className="start-btn" href={LINE_OFFICIAL_URL}>
-                  LINE登録して診断を始める✨
-                </a>
+                <button type="button" className="start-btn" onClick={() => navigate("/line")}>
+                  推し色診断を始める✨
+                </button>
               </section>
             )}
 
@@ -350,9 +428,9 @@ export function GoddessPage() {
             <button type="button" className="welcome-glass-btn" onClick={beginDiagnosisQuiz}>
               診断する
             </button>
-            <a className="welcome-line-btn" href={LINE_OFFICIAL_URL} target="_blank" rel="noopener noreferrer">
-              LINEで診断を受ける
-            </a>
+            <button type="button" className="welcome-line-btn" onClick={() => navigate("/line")}>
+              推し色診断を始める
+            </button>
           </div>
         </div>
       )}
@@ -373,6 +451,17 @@ export function QuestionPage() {
   const finalVideoRef = useRef(null);
 
   useLayoutEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        if (window.sessionStorage.getItem(LINE_GATE_SESSION_KEY) !== "1") {
+          navigate("/line", { replace: true });
+          return;
+        }
+      } catch (_) {
+        navigate("/line", { replace: true });
+        return;
+      }
+    }
     const step = (searchParams.get(QUESTION_ENTRY_STEP_PARAM) || "").toLowerCase();
     if (step === QUESTION_PHASE_QUIZ) {
       setPhase(QUESTION_PHASE_QUIZ);
@@ -385,7 +474,7 @@ export function QuestionPage() {
     setCurrentQ(0);
     setScores(initialScores);
     resultKeyRef.current = "";
-  }, [searchParams]);
+  }, [navigate, searchParams]);
 
   useEffect(() => {
     if (QUESTION_PHASE_ALLOWED.has(phase)) return;
@@ -590,193 +679,81 @@ const RESULT_LINE_NEXT_COPY = `この先では、
 
 をLINEでお届けします✨`;
 
-/** LINE「テキストで送信」用。`resultKey` は常に URL `?type=` を normalize した診断キー（mint / lavender …）のみを渡す */
-function buildLineTextShareUrl(resultKeyNorm) {
-  const key = (resultKeyNorm && String(resultKeyNorm).trim()) || "";
-  if (!key) return null;
-  return `https://line.me/R/msg/text/?${encodeURIComponent(key)}`;
-}
-
 /** /result：結果カードと LINE 送信のみ */
 export function ResultPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  /** 現在の診断タイプ: 常に URL の ?type= から正規化（undefined にならないよう null は空文字にしない — 無効時は null のままリダイレクト） */
-  const resultKey = normalizeTypeKey(searchParams.get("type") || "");
+  /** 送信テキスト用: クエリの生値（ご指定どおり） */
+  const resultKey = searchParams.get("type");
+  /** 結果カード・リダイレクト用: 正規化キー */
+  const normalizedTypeKey = normalizeTypeKey((resultKey || "").trim());
   const resultModeFull = (searchParams.get("mode") || "free").toLowerCase() === "full";
-  const result = resultKey ? results[resultKey] : null;
-  const resultKeyRef = useRef(resultKey || "");
-
-  const [liffCompleteError, setLiffCompleteError] = useState("");
-  const [liffSaveLoading, setLiffSaveLoading] = useState(false);
-  const [lineLoginResumeBump, setLineLoginResumeBump] = useState(0);
-  const liffMsgSentRef = useRef(false);
-  const liffSaveInFlightRef = useRef(false);
+  const result = normalizedTypeKey ? results[normalizedTypeKey] : null;
+  const resultKeyRef = useRef(normalizedTypeKey || "");
 
   useLayoutEffect(() => {
-    if (!resultKey || !result) {
+    if (!normalizedTypeKey || !result) {
       navigate("/", { replace: true });
     }
-  }, [resultKey, result, navigate]);
+  }, [normalizedTypeKey, result, navigate]);
 
   useEffect(() => {
-    resultKeyRef.current = resultKey || "";
-    if (resultKey) writeStoredOshiType(resultKey);
-  }, [resultKey]);
+    resultKeyRef.current = normalizedTypeKey || "";
+    if (normalizedTypeKey) writeStoredOshiType(normalizedTypeKey);
+  }, [normalizedTypeKey]);
 
-  useEffect(() => {
-    const onPageShow = (e) => {
-      if (e && e.persisted) {
-        setLineLoginResumeBump((n) => n + 1);
-      }
-    };
-    if (typeof window !== "undefined") {
-      window.addEventListener("pageshow", onPageShow);
-      return () => window.removeEventListener("pageshow", onPageShow);
+  async function handleLineSend(ev) {
+    console.log("HANDLE_LINE_SEND_V2");
+    if (ev && typeof ev.preventDefault === "function") {
+      ev.preventDefault();
     }
-    return undefined;
-  }, []);
+    if (ev && typeof ev.stopPropagation === "function") {
+      ev.stopPropagation();
+    }
 
-  useEffect(() => {
-    if (!REACT_APP_LIFF_ID) return undefined;
-
-    const urlParams = new URLSearchParams(typeof window !== "undefined" ? window.location.search || "" : "");
-    const typeFromUrl = urlParams.get("type");
-
-    let pendingRaw = "";
     try {
-      pendingRaw = typeof window !== "undefined" ? window.sessionStorage.getItem(PENDING_LINE_SEND_KEY) || "" : "";
-    } catch (_) {
-      /* ignore */
-    }
-    const pending = normalizeTypeKey(pendingRaw);
-    const urlType = normalizeTypeKey(typeFromUrl || "");
+      await liff.init({
+        liffId: "2009787218-kjVGGHUD"
+      });
 
-    const finalResultKey = resolveFinalResultKey(resultKeyRef.current || resultKey, typeFromUrl, pendingRaw);
-    if (!finalResultKey) return undefined;
-
-    const pendingOk = Boolean(pending && pending === finalResultKey);
-    const urlOk = Boolean(urlType && urlType === finalResultKey);
-    if (!pendingOk && !urlOk) {
-      return undefined;
-    }
-
-    if (liffMsgSentRef.current) return undefined;
-    if (liffSaveInFlightRef.current) return undefined;
-
-    let cancelled = false;
-    (async () => {
-      try {
-        liffSaveInFlightRef.current = true;
-        setLiffSaveLoading(true);
-        setLiffCompleteError("");
-        const liffMod = await import("@line/liff");
-        const liff = liffMod.default;
-        const uaResume = typeof navigator !== "undefined" ? navigator.userAgent || "" : "";
-        const likelyLineInAppResume = /Line\//i.test(uaResume);
-        await liff.init({
-          liffId: REACT_APP_LIFF_ID,
-          ...(likelyLineInAppResume ? {} : { withLoginOnExternalBrowser: true })
-        });
-        if (cancelled) return;
-        if (!liff.isLoggedIn()) {
-          return;
-        }
-        const urlParamsNow = new URLSearchParams(window.location.search || "");
-        const typeFromUrlNow = urlParamsNow.get("type");
-        let pendingRawNow = "";
-        try {
-          pendingRawNow = window.sessionStorage.getItem(PENDING_LINE_SEND_KEY) || "";
-        } catch (_) {
-          /* ignore */
-        }
-        const pendingNow = normalizeTypeKey(pendingRawNow);
-        const urlTypeNow = normalizeTypeKey(typeFromUrlNow || "");
-        const finalResultKeyNow = resolveFinalResultKey(resultKeyRef.current || resultKey, typeFromUrlNow, pendingRawNow);
-        if (!finalResultKeyNow) return;
-        const stillPendingOk = Boolean(pendingNow && pendingNow === finalResultKeyNow);
-        const stillUrlOk = Boolean(urlTypeNow && urlTypeNow === finalResultKeyNow);
-        if (!stillPendingOk && !stillUrlOk) {
-          return;
-        }
-        const out = await handleComplete(finalResultKeyNow);
-        if (cancelled) return;
-        if (out.ok) {
-          liffMsgSentRef.current = true;
-          setLiffCompleteError("");
-          const rk = finalResultKeyNow || resultKey || "";
-          const shareUrl = buildLineTextShareUrl(rk);
-          if (shareUrl) window.location.href = shareUrl;
-          else await openLineOfficialAccountLink();
-        } else if (out.message) {
-          setLiffCompleteError(out.message);
-        }
-      } catch (e) {
-        if (!cancelled) {
-          setLiffCompleteError("送信処理でエラーが発生しました。もう一度ボタンからお試しください。");
-        }
-      } finally {
-        if (!cancelled) {
-          liffSaveInFlightRef.current = false;
-          setLiffSaveLoading(false);
-        }
+      if (!liff.isInClient()) {
+        console.log("LINE外なので何もしない");
+        return;
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [resultKey, lineLoginResumeBump]);
+
+      if (!resultKey) return;
+
+      await liff.sendMessages([
+        { type: "text", text: resultKey }
+      ]);
+
+    } catch (e) {
+      console.error(e);
+    }
+  }
 
   const resetDiagnosis = () => {
-    setLiffCompleteError("");
-    setLiffSaveLoading(false);
-    liffSaveInFlightRef.current = false;
     try {
       if (typeof window !== "undefined") {
         window.sessionStorage.removeItem(PENDING_LINE_SEND_KEY);
         window.sessionStorage.removeItem(LIFF_LOGIN_STARTED_KEY);
+        window.sessionStorage.removeItem(LINE_GATE_SESSION_KEY);
       }
     } catch (_) {
       /* ignore */
     }
-    liffMsgSentRef.current = false;
     clearStoredOshiType();
     navigate("/", { replace: true });
   };
 
-  const renderLineContinueBlock = () => {
-    /** 優先: URL `?type=` 正規化（resultKey）。欠ける場合のみ session の推し色（writeStoredOshiType と同じ系） */
-    const diagnosticResultKey =
-      (resultKey && String(resultKey).trim()) || normalizeTypeKey(readStoredOshiType() || "") || "";
-    const textForLineProbe =
-      (result && typeof result.name === "string" && result.name.trim()) || diagnosticResultKey;
-    return (
-      <div className="result-line-next-wrap">
-        <p className="result-line-next-copy">{RESULT_LINE_NEXT_COPY}</p>
-        <button
-          type="button"
-          className="result-line-next-btn"
-          disabled={!diagnosticResultKey}
-          onClick={async (ev) => {
-            ev.preventDefault();
-            console.log("button clicked");
-            console.log("diagnosticResultKey:", diagnosticResultKey);
-            if (!diagnosticResultKey) {
-              console.warn("LINE button: diagnosticResultKey empty — early return (if (!diagnosticResultKey))");
-              setLiffCompleteError("診断結果を取得できませんでした。画面を更新するか、もう一度診断してください。");
-              return;
-            }
-            const lineTextShareHref = `https://line.me/R/msg/text/?${encodeURIComponent(diagnosticResultKey)}`;
-            setLiffCompleteError("");
-            console.log("LINE button: opening text share", { lineTextShareHref, textForLineProbe });
-            window.location.href = lineTextShareHref;
-          }}
-        >
-          LINEで続きを受け取る🩷
-        </button>
-      </div>
-    );
-  };
+  const renderLineContinueBlock = () => (
+    <div className="result-line-next-wrap">
+      <p className="result-line-next-copy">{RESULT_LINE_NEXT_COPY}</p>
+      <button type="button" className="result-line-next-btn" disabled={!resultKey?.trim()} onClick={handleLineSend}>
+        LINEで続きを見る
+      </button>
+    </div>
+  );
 
   const renderOshiResultCard = (res, isFull, typeKey) => {
     const baseShopUrl = getBaseShopUrlForType(typeKey);
@@ -786,9 +763,17 @@ export function ResultPage() {
           <p className="result-base-guide-title">LINE登録の次は、こちらからフル鑑定へ</p>
           <p className="result-base-guide-sub">あなたの推し色に合わせた詳細診断をBASEで確認できます。</p>
         </div>
-        <a className="result-base-cta" href={baseShopUrl} target="_blank" rel="noopener noreferrer">
+        <button
+          type="button"
+          className="result-base-cta"
+          onClick={() => {
+            if (typeof window !== "undefined") {
+              window.open(baseShopUrl, "_blank", "noopener,noreferrer");
+            }
+          }}
+        >
           {`▶ BASEで${res.name}のフル鑑定を見る`}
-        </a>
+        </button>
       </div>
     );
     const header = (
@@ -856,7 +841,7 @@ export function ResultPage() {
     );
   };
 
-  if (!resultKey || !result) {
+  if (!normalizedTypeKey || !result) {
     return null;
   }
 
@@ -935,15 +920,7 @@ export function ResultPage() {
           <h1 className="title">推し活💜推し色占い</h1>
           <p className="desc">あなたにふさわしい推し色を教えてくれる。</p>
         </header>
-        {liffCompleteError ? (
-          <div className="result-liff-error" role="alert">
-            <p className="result-liff-error__text">{liffCompleteError}</p>
-          </div>
-        ) : null}
-        {liffSaveLoading && !liffCompleteError ? (
-          <div className="result-liff-sending">結果をLINEに送信中です…</div>
-        ) : null}
-        {renderOshiResultCard(result, resultModeFull, resultKey)}
+        {renderOshiResultCard(result, resultModeFull, normalizedTypeKey)}
       </main>
     </div>
   );
