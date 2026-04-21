@@ -10,9 +10,6 @@ const INTRO_DIAGNOSIS_MS = 15000;
 /** 無音のまま welcome 動画が終わったあと、中間表示へ進むまでの待ち時間 */
 const WELCOME_MUTED_END_DELAY_MS = 7000;
 const LINE_OFFICIAL_URL = "https://liff.line.me/2009787218-kjVGGHUD";
-const LINE_QR_IMAGE_URL =
-  process.env.REACT_APP_LINE_QR_IMAGE_URL ||
-  `https://quickchart.io/qr?text=${encodeURIComponent(LINE_OFFICIAL_URL)}&size=280`;
 const BASE_FULL_URL = process.env.REACT_APP_BASE_FULL_URL || "https://thebase.in/";
 /** /api 呼び出し先（別 Vercel ドメインで開いても shima-brand 側の Functions を叩く） */
 const PUBLIC_APP_ORIGIN = (
@@ -871,27 +868,6 @@ const styles = `
     text-decoration: none;
     text-align: center;
     box-sizing: border-box;
-  }
-  .line-qr-wrap {
-    margin-top: 12px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-  }
-  .line-qr-img {
-    width: min(58vw, 170px);
-    height: auto;
-    border-radius: 12px;
-    background: #fff;
-    border: 1px solid rgba(0, 0, 0, 0.08);
-    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.08);
-  }
-  .line-qr-note {
-    margin: 0;
-    color: #777;
-    font-size: 12px;
-    line-height: 1.4;
   }
   .floating-note { margin-top: 2px; color: #999; font-size: 12px; }
   .start-screen .diagnosis-quiz-start {
@@ -2075,10 +2051,6 @@ export default function App() {
                 公式LINEを友だち追加すると、お送りするリンクから推し色診断（全7問）へ進めます。まずはLINEへどうぞ。
               </p>
               <a className="start-btn" href={LINE_OFFICIAL_URL}>LINE登録して診断を始める✨</a>
-              <div className="line-qr-wrap">
-                <img className="line-qr-img" src={LINE_QR_IMAGE_URL} alt="LINE登録用QRコード" />
-                <p className="line-qr-note">うまく開けない場合はQRコードから</p>
-              </div>
             </section>
           )}
 
