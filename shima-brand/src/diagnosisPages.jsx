@@ -214,7 +214,7 @@ export function GoddessPage() {
   const navigate = useNavigate();
   const [welcomeMuted, setWelcomeMuted] = useState(true);
   const [welcomeExiting, setWelcomeExiting] = useState(false);
-  const [phase, setPhase] = useState("start");
+  const [phase, setPhase] = useState(GODDESS_PHASE_GODDESS_VIDEO);
   const welcomeVideoRef = useRef(null);
   const welcomeExitTimerRef = useRef(null);
   const welcomeSilentSkipTimerRef = useRef(null);
@@ -398,7 +398,7 @@ export function GoddessPage() {
                 <p className="start-text">
                   公式LINEを友だち追加すると、お送りするリンクから推し色診断（全7問）へ進めます。まずはLINEへどうぞ。
                 </p>
-                <button type="button" className="start-btn" onClick={() => navigate("/line")}>
+                <button type="button" className="start-btn" onClick={beginDiagnosisQuiz}>
                   推し色診断を始める✨
                 </button>
               </section>
@@ -428,7 +428,7 @@ export function GoddessPage() {
             <button type="button" className="welcome-glass-btn" onClick={beginDiagnosisQuiz}>
               診断する
             </button>
-            <button type="button" className="welcome-line-btn" onClick={() => navigate("/line")}>
+            <button type="button" className="welcome-line-btn" onClick={beginDiagnosisQuiz}>
               推し色診断を始める
             </button>
           </div>
