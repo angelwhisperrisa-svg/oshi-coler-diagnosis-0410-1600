@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useHref, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import liff from "@line/liff";
 import { LineOfficialFriendBlock } from "./lineOfficialFriendBlock";
 import {
@@ -216,6 +216,7 @@ export function LinePage() {
 /** / と /start：女神〜診断前カードのみ */
 export function GoddessPage() {
   const navigate = useNavigate();
+  const lineHref = useHref("/line");
   const [welcomeMuted, setWelcomeMuted] = useState(true);
   const [welcomeExiting, setWelcomeExiting] = useState(false);
   const [phase, setPhase] = useState(GODDESS_PHASE_GODDESS_VIDEO);
@@ -282,7 +283,8 @@ export function GoddessPage() {
   const handleWelcomeEnded = () => {
     const v = welcomeVideoRef.current;
     if (welcomeEngagedRef.current) {
-      if (!v || v.muted) return;
+      // onEnded 時点では動画は終了している。muted の一瞬のズレでレインボーへ進めなくなるのを防ぐ
+      if (!v) return;
       if (welcomeExitTimerRef.current) window.clearTimeout(welcomeExitTimerRef.current);
       setWelcomeExiting(true);
       welcomeExitTimerRef.current = window.setTimeout(() => {
@@ -311,6 +313,12 @@ export function GoddessPage() {
       }
     } catch (_) {
       /* ignore */
+    }
+    // LINE 内蔵ブラウザ等で History API のクライアント遷移だけが効かないことがあるため、フルナビで確実に /line へ
+    if (typeof window !== "undefined" && lineHref) {
+      const path = lineHref.startsWith("/") ? lineHref : `/${lineHref}`;
+      window.location.assign(`${window.location.origin}${path}`);
+      return;
     }
     navigate("/line");
   };

@@ -14,7 +14,7 @@ const BASE_FULL_URL = process.env.REACT_APP_BASE_FULL_URL || "https://thebase.in
  */
 const LINE_OFFICIAL_FRIEND_URL = "https://line.me/R/ti/p/@877xrsvw";
 /** /question へ入る前に必ず通過（LinePage の「診断を始める」でセット。直打ちは /line へ戻す） */
-export const LINE_GATE_SESSION_KEY = "LINE_GATE_SESSION_KEY";
+export const LINE_GATE_SESSION_KEY = "oshi_line_gate_ok_v1";
 
 const RESULT_TYPE_KEYS = ["mint", "rose", "lavender", "ivory", "skyblue"];
 /** LIFF ログイン遷移後の再開用セッションキー（レガシー互換・RouteRedirects で参照） */
