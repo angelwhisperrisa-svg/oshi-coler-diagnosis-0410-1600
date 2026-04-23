@@ -7,220 +7,20 @@ const VIDEO = {
 const INTRO_DIAGNOSIS_MS = 15000;
 /** 無音のまま welcome 動画が終わったあと、中間表示へ進むまでの待ち時間 */
 const WELCOME_MUTED_END_DELAY_MS = 7000;
-const LINE_OFFICIAL_URL = "https://line.me/R/ti/p/@877xrsvw";
 const BASE_FULL_URL = process.env.REACT_APP_BASE_FULL_URL || "https://thebase.in/";
+/**
+ * 【必須・削除禁止】公式LINE 友だち追加URL。
+ * GoddessPage（女神ウェルカム）・診断前レインボー画面の QR / 友だちリンク専用。診断結果の LINE 共有とは別。
+ */
+const LINE_OFFICIAL_FRIEND_URL = "https://line.me/R/ti/p/@877xrsvw";
+/** /question へ入る前に必ず通過（LinePage の「診断を始める」でセット。直打ちは /line へ戻す） */
+export const LINE_GATE_SESSION_KEY = "LINE_GATE_SESSION_KEY";
 
 const RESULT_TYPE_KEYS = ["mint", "rose", "lavender", "ivory", "skyblue"];
-const REACT_APP_LIFF_ID = process.env.REACT_APP_LIFF_ID || "";
-/** Vercel本番ドメイン等。LIFFから別オリジンで開いたときも push-result を正しいホストへ送る */
-const REACT_APP_PUBLIC_APP_ORIGIN = (process.env.REACT_APP_PUBLIC_APP_ORIGIN || "").replace(/\/$/, "");
-/** LIFF ログイン遷移後に push-result を再開するためのフラグ（値は resultKey） */
+/** LIFF ログイン遷移後の再開用セッションキー（レガシー互換・RouteRedirects で参照） */
 const PENDING_LINE_SEND_KEY = "pendingLineSend";
-/** 同一セッションでの liff.login 多重起動防止（ログイン完了・診断リセット・push成功時に削除） */
+/** 同一セッションでの liff.login 多重起動防止 */
 const LIFF_LOGIN_STARTED_KEY = "liff_login_started";
-
-/**
- * 未ログイン時は liff.login({ redirectUri }) のみ（現在の URL＝/result?type=… を維持）。ログイン後に getProfile → /api/line/push-result。
- * @returns {Promise<{ ok: true } | { ok: false, kind: "login_redirect" } | { ok: false, kind: "error", message: string }>}
- */
-async function handleComplete(resultKey) {
-  console.log("handleComplete START");
-  console.log("CURRENT URL:", window.location.href);
-  console.log("finalResultKey:", resultKey);
-  console.log("[handleComplete] start", { resultKey, hasLiffId: Boolean(REACT_APP_LIFF_ID) });
-
-  if (!REACT_APP_LIFF_ID || !RESULT_TYPE_KEYS.includes(resultKey)) {
-    console.log("[handleComplete] return: invalid LIFF or resultKey");
-    return { ok: false, kind: "error", message: "診断結果の送信設定が無効です。" };
-  }
-  let liff;
-  try {
-    liff = (await import("@line/liff")).default;
-    console.log("liff.init start");
-    const ua = typeof navigator !== "undefined" ? navigator.userAgent || "" : "";
-    const likelyLineInApp = /Line\//i.test(ua);
-    await liff.init({
-      liffId: REACT_APP_LIFF_ID,
-      ...(likelyLineInApp ? {} : { withLoginOnExternalBrowser: true })
-    });
-    console.log("liff.isLoggedIn:", liff.isLoggedIn());
-    console.log("liff.isInClient:", liff.isInClient());
-    // ログイン完了かつ pending があるときだけ「ログイン開始中」を外す（通常ログイン済み訪問ではフラグを触らない）
-    if (liff.isLoggedIn()) {
-      try {
-        if (typeof window !== "undefined") {
-          const pending = window.sessionStorage.getItem(PENDING_LINE_SEND_KEY);
-          if (pending) {
-            window.sessionStorage.removeItem(LIFF_LOGIN_STARTED_KEY);
-          }
-        }
-      } catch (_) {
-        /* ignore */
-      }
-    }
-  } catch (e) {
-    console.warn("[handleComplete] liff.init failed", e);
-    console.log("[handleComplete] return: liff.init failed");
-    return { ok: false, kind: "error", message: "LINE連携の初期化に失敗しました。しばらくしてから再度お試しください。" };
-  }
-
-  if (!liff.isLoggedIn()) {
-    let pendingRawBefore = "";
-    try {
-      pendingRawBefore =
-        typeof window !== "undefined" ? window.sessionStorage.getItem(PENDING_LINE_SEND_KEY) || "" : "";
-    } catch (_) {
-      /* ignore */
-    }
-    let loginFlagSet = false;
-    try {
-      loginFlagSet =
-        typeof window !== "undefined" && Boolean(window.sessionStorage.getItem(LIFF_LOGIN_STARTED_KEY));
-    } catch (_) {
-      /* ignore */
-    }
-    const prevPendingNorm = normalizeTypeKey(pendingRawBefore);
-    const keyNorm = normalizeTypeKey(resultKey);
-    // pending が欠損／別結果なのに started だけ残る → フラグを捨ててログイン再試行（session 欠損時の復帰）
-    if (loginFlagSet && (!prevPendingNorm || prevPendingNorm !== keyNorm)) {
-      try {
-        if (typeof window !== "undefined") window.sessionStorage.removeItem(LIFF_LOGIN_STARTED_KEY);
-      } catch (_) {
-        /* ignore */
-      }
-      loginFlagSet = false;
-      console.log("[handleComplete] cleared stale LIFF_LOGIN_STARTED_KEY (pending missing or mismatch)");
-    }
-    // 同一結果でログイン OAuth 進行中のみ抑止（二重 liff.login 防止）
-    if (loginFlagSet && prevPendingNorm && prevPendingNorm === keyNorm) {
-      console.log("[handleComplete] skip liff.login: login already in progress for this resultKey");
-      return {
-        ok: false,
-        kind: "error",
-        message: "ログイン処理が既に開始されています。LINEアプリで開き直すか、しばらく待ってから再度お試しください。"
-      };
-    }
-    try {
-      if (typeof window !== "undefined") window.sessionStorage.setItem(PENDING_LINE_SEND_KEY, resultKey);
-    } catch (_) {
-      /* ignore */
-    }
-    try {
-      const readBack = typeof window !== "undefined" ? window.sessionStorage.getItem(PENDING_LINE_SEND_KEY) || "" : "";
-      console.log("[handleComplete] PENDING_LINE_SEND_KEY write/read", { wrote: resultKey, readBack });
-    } catch (e) {
-      console.log("[handleComplete] PENDING_LINE_SEND_KEY readBack error", e);
-    }
-    try {
-      if (typeof window !== "undefined") window.sessionStorage.setItem(LIFF_LOGIN_STARTED_KEY, "1");
-    } catch (_) {
-      /* ignore */
-    }
-    const redirectUri = typeof window !== "undefined" ? window.location.href : "";
-    console.log("[handleComplete] liff.login redirectUri:", redirectUri);
-    console.log("before liff.login");
-    liff.login({ redirectUri });
-    console.log("[handleComplete] return: login_redirect (liff.login with redirectUri)");
-    return { ok: false, kind: "login_redirect" };
-  }
-
-  let profile;
-  try {
-    profile = await liff.getProfile();
-    console.log("after getProfile", profile);
-  } catch (e) {
-    console.warn("[handleComplete] getProfile failed", e);
-    console.log("[handleComplete] return: getProfile failed");
-    return { ok: false, kind: "error", message: "LINEのユーザー情報を取得できませんでした。LINEアプリから開き直してお試しください。" };
-  }
-  console.log("profile result:", profile);
-
-  const lineUserId = profile?.userId || null;
-  if (!lineUserId) {
-    console.log("[handleComplete] return: empty profile.userId");
-    return { ok: false, kind: "error", message: "ユーザーIDを取得できませんでした。LINEアプリから開き直してお試しください。" };
-  }
-
-  console.log("sending result:", resultKey);
-
-  const origin =
-    REACT_APP_PUBLIC_APP_ORIGIN ||
-    (typeof window !== "undefined" ? window.location.origin : "");
-  const pushBody = { lineUserId, resultType: resultKey };
-
-  const parsePushJson = async (response) => {
-    const raw = await response.text();
-    try {
-      return { raw, data: JSON.parse(raw) };
-    } catch {
-      return { raw, data: {} };
-    }
-  };
-
-  try {
-    console.log("calling push-result API");
-    const res = await fetch(`${origin}/api/line/push-result`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(pushBody)
-    });
-    console.log("push-result response:", res.status);
-    const { data } = await parsePushJson(res);
-    if (!res.ok || data.failure === true || data.success === false) {
-      console.warn("[handleComplete] push-result failure", res.status, data);
-      const hint = typeof data.detail === "string" ? data.detail.slice(0, 120) : "";
-      console.log("[handleComplete] return: push-result failure", res.status);
-      return {
-        ok: false,
-        kind: "error",
-        message: hint ? `結果の送信に失敗しました。（${hint}）` : "結果の送信に失敗しました。もう一度お試しください。"
-      };
-    }
-  } catch (e) {
-    console.warn("[handleComplete] fetch failed", e);
-    console.log("[handleComplete] return: fetch exception");
-    return { ok: false, kind: "error", message: "通信エラーが発生しました。通信状況をご確認のうえ、再度お試しください。" };
-  }
-
-  try {
-    if (typeof window !== "undefined") {
-      window.sessionStorage.removeItem(PENDING_LINE_SEND_KEY);
-      window.sessionStorage.removeItem(LIFF_LOGIN_STARTED_KEY);
-    }
-  } catch (_) {
-    /* ignore */
-  }
-  console.log("[handleComplete] return: ok true");
-  return { ok: true };
-}
-
-/**
- * 公式LINE（友だち追加）へ。LIFF 内は external:false で LINE 内ブラウザを切り替えやすい。
- * openWindow が無い／失敗時は同一 WebView で location.assign。
- * （自動再開有効時のみ参照 — DEBUG 単一路径中は未使用）
- */
-// eslint-disable-next-line no-unused-vars
-async function openLineOfficialAccountLink() {
-  if (typeof window === "undefined") return;
-  if (REACT_APP_LIFF_ID) {
-    try {
-      const liff = (await import("@line/liff")).default;
-      await liff.init({ liffId: REACT_APP_LIFF_ID });
-      const inClient = typeof liff.isInClient === "function" && liff.isInClient();
-      if (inClient && typeof liff.openWindow === "function") {
-        liff.openWindow({ url: LINE_OFFICIAL_URL, external: false });
-        return;
-      }
-      if (inClient) {
-        window.location.assign(LINE_OFFICIAL_URL);
-        return;
-      }
-    } catch (e) {
-      console.warn("[openLineOfficialAccountLink]", e);
-    }
-  }
-  window.location.assign(LINE_OFFICIAL_URL);
-}
 
 /** 診断タイプ保持（リッチメニュー等の /result?auto=true から分岐するため） */
 const OSHI_RESULT_STORAGE_KEY = "shima_oshi_result_v1";
@@ -301,7 +101,7 @@ function parseResultRoute(pathname, search) {
   const params = new URLSearchParams(search || "");
   const typeFromQuery = normalizeTypeKey(params.get("type"));
 
-  /** LIFF 等: エンドポイントが / でも ?type=mint で結果画面へ（例: https://liff.line.me/xxx?type=mint） */
+  /** LIFF 等: エンドポイントが / でもクエリに type があれば結果画面として扱う */
   if (typeFromQuery && !isResultPath && path !== "/start") {
     const modeParam = (params.get("mode") || "free").toLowerCase();
     return {
@@ -811,6 +611,11 @@ const styles = `
     text-align: center;
     margin-top: 12px;
   }
+  .line-page-start-btn {
+    margin-top: 22px;
+    width: 100%;
+    justify-content: center;
+  }
 
   .progress-wrap { margin-bottom: 14px; }
   .progress-label {
@@ -944,8 +749,12 @@ const styles = `
     align-items: center;
     justify-content: center;
     width: 100%;
+    font-family: inherit;
     text-decoration: none;
     border-radius: 18px;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
     padding: 20px 20px;
     font-size: clamp(17px, 4.8vw, 20px);
     font-weight: 800;
@@ -1289,6 +1098,85 @@ const styles = `
     transform: scale(0.98);
   }
 
+  /* 【必須・削除禁止】友だち追加 QR + リンク（Goddess ウェルカム / レインボー前） */
+  .line-official-friend-block {
+    pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    text-align: center;
+    box-sizing: border-box;
+  }
+  .line-official-friend-block--card {
+    margin-top: 16px;
+    padding: 16px 18px 18px;
+    border-radius: 18px;
+    background: linear-gradient(155deg, rgba(255, 255, 255, 0.92), rgba(248, 242, 255, 0.82));
+    border: 1px solid rgba(200, 170, 240, 0.5);
+    box-shadow: 0 10px 30px rgba(120, 80, 180, 0.14);
+    max-width: min(100%, 400px);
+    width: 100%;
+    margin-inline: auto;
+  }
+  .line-official-friend-block__title {
+    margin: 0;
+    font-weight: 800;
+    font-size: clamp(14px, 3.8vw, 16px);
+    color: #2f2640;
+    letter-spacing: 0.02em;
+  }
+  .line-official-friend-block__note {
+    margin: 0;
+    font-size: clamp(12px, 3.2vw, 14px);
+    line-height: 1.45;
+    color: #5c5470;
+    font-weight: 600;
+  }
+  .line-official-friend-block__qr-wrap {
+    border-radius: 12px;
+    overflow: hidden;
+    background: #fff;
+    padding: 6px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  }
+  .line-official-friend-block__qr {
+    display: block;
+    width: 128px;
+    height: 128px;
+    object-fit: contain;
+  }
+  .line-official-friend-block--card .line-official-friend-block__qr {
+    width: 168px;
+    height: 168px;
+  }
+  .line-official-friend-block__link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 10px 20px;
+    border-radius: 999px;
+    font-family: inherit;
+    font-size: clamp(13px, 3.5vw, 15px);
+    font-weight: 800;
+    color: #fff;
+    text-decoration: none;
+    background: #06c755;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    box-shadow: 0 8px 22px rgba(6, 199, 85, 0.35);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .line-official-friend-block__link:hover {
+    box-shadow: 0 12px 28px rgba(6, 199, 85, 0.42);
+  }
+  .line-official-friend-block__link:active {
+    transform: scale(0.98);
+  }
+
   @keyframes welcomeGlassIn {
     from { opacity: 0; transform: translateY(12px); }
     to { opacity: 1; transform: translateY(0); }
@@ -1434,11 +1322,9 @@ export {
   VIDEO,
   INTRO_DIAGNOSIS_MS,
   WELCOME_MUTED_END_DELAY_MS,
-  LINE_OFFICIAL_URL,
   BASE_FULL_URL,
+  LINE_OFFICIAL_FRIEND_URL,
   RESULT_TYPE_KEYS,
-  REACT_APP_LIFF_ID,
-  REACT_APP_PUBLIC_APP_ORIGIN,
   PENDING_LINE_SEND_KEY,
   LIFF_LOGIN_STARTED_KEY,
   questions,
@@ -1449,8 +1335,6 @@ export {
   petalLanes,
   butterflyLanes,
   styles,
-  handleComplete,
-  openLineOfficialAccountLink,
   readStoredOshiType,
   writeStoredOshiType,
   clearStoredOshiType,
