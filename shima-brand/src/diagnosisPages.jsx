@@ -214,7 +214,7 @@ export function GoddessPage() {
   const navigate = useNavigate();
   const [welcomeMuted, setWelcomeMuted] = useState(true);
   const [welcomeExiting, setWelcomeExiting] = useState(false);
-  const [phase, setPhase] = useState(GODDESS_PHASE_GODDESS_VIDEO);
+  const [phase, setPhase] = useState("start");
   const welcomeVideoRef = useRef(null);
   const welcomeExitTimerRef = useRef(null);
   const welcomeSilentSkipTimerRef = useRef(null);
