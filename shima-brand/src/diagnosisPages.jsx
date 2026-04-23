@@ -703,13 +703,10 @@ export function ResultPage() {
   }, [normalizedTypeKey]);
 
   async function handleLineSend(ev) {
-    console.log("HANDLE_LINE_SEND_V2");
-    if (ev && typeof ev.preventDefault === "function") {
-      ev.preventDefault();
-    }
-    if (ev && typeof ev.stopPropagation === "function") {
-      ev.stopPropagation();
-    }
+    console.log("HANDLE_LINE_SEND_V4");
+
+    if (ev?.preventDefault) ev.preventDefault();
+    if (ev?.stopPropagation) ev.stopPropagation();
 
     try {
       await liff.init({
@@ -717,18 +714,31 @@ export function ResultPage() {
       });
 
       if (!liff.isInClient()) {
-        console.log("LINE外なので何もしない");
+        alert("LINEアプリ内で開いてから押してください");
         return;
       }
 
-      if (!resultKey) return;
+      const text = (resultKey || "").trim();
+      if (!text) {
+        alert("診断結果キーが見つかりませんでした");
+        return;
+      }
+
+      console.log("STEP_SEND_BEFORE", text);
 
       await liff.sendMessages([
-        { type: "text", text: resultKey }
+        { type: "text", text }
       ]);
 
+      console.log("STEP_SEND_DONE");
+
+      if (typeof liff.closeWindow === "function") {
+        liff.closeWindow();
+      }
+
     } catch (e) {
-      console.error(e);
+      console.error("HANDLE_LINE_SEND_V4_ERROR", e);
+      alert("送信に失敗しました");
     }
   }
 
@@ -749,8 +759,8 @@ export function ResultPage() {
   const renderLineContinueBlock = () => (
     <div className="result-line-next-wrap">
       <p className="result-line-next-copy">{RESULT_LINE_NEXT_COPY}</p>
-      <button type="button" className="result-line-next-btn" disabled={!resultKey?.trim()} onClick={handleLineSend}>
-        LINEで続きを見る
+      <button onClick={handleLineSend}>
+        LINEで続きを受け取る
       </button>
     </div>
   );
