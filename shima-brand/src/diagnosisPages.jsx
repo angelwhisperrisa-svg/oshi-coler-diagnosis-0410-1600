@@ -134,6 +134,10 @@ export function RouteRedirects() {
 export function LinePage() {
   const navigate = useNavigate();
 
+  useEffect(() => {
+    console.log("LINE_PAGE_RENDER");
+  }, []);
+
   useLayoutEffect(() => {
     try {
       if (typeof window !== "undefined") {
@@ -299,6 +303,7 @@ export function GoddessPage() {
   };
 
   const beginDiagnosisQuiz = () => {
+    console.log("RAINBOW_CLICK");
     try {
       if (typeof window !== "undefined") {
         window.sessionStorage.removeItem(PENDING_LINE_SEND_KEY);
