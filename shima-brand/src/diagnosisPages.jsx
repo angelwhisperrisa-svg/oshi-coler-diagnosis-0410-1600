@@ -21,7 +21,8 @@ import {
   normalizeTypeKey,
   computeResultFromScores,
   getBaseShopUrlForType,
-  parseResultRoute
+  parseResultRoute,
+  LINE_GATE_SESSION_KEY
 } from "./diagnosisShared";
 
 const QUESTION_ENTRY_STEP_PARAM = "step";
