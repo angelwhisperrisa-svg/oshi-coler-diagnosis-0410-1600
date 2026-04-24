@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useHref, useLocation, useNavigate, useSearchParams, Routes, Route, Navigate } from "react-router-dom";
 import liff from "@line/liff";
 
@@ -2217,7 +2217,7 @@ function ResultPage() {
     if (normalizedTypeKey) writeStoredOshiType(normalizedTypeKey);
   }, [normalizedTypeKey]);
 
-  async function handleLineSend(options = {}) {
+  const handleLineSend = useCallback(async (options = {}) => {
     const { resumed = false } = options || {};
 
     try {
@@ -2319,7 +2319,7 @@ function ResultPage() {
       console.error("[LINE_SEND] failed:", error);
       alert("送信に失敗しました");
     }
-  }
+  }, [normalizedTypeKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2353,7 +2353,7 @@ function ResultPage() {
     return () => {
       cancelled = true;
     };
-  }, [normalizedTypeKey]);
+  }, [normalizedTypeKey, handleLineSend]);
 
   const resetDiagnosis = () => {
     try {
