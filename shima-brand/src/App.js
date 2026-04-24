@@ -2057,11 +2057,6 @@ function ResultPage() {
         liffId: "2009787218-kjVGGHUD"
       });
 
-      if (!liff.isInClient()) {
-        alert("LINEアプリ内で開いてから押してください");
-        return;
-      }
-
       const text = (resultKey || "").trim();
       if (!text) {
         alert("診断結果キーが見つかりませんでした");
@@ -2070,11 +2065,63 @@ function ResultPage() {
 
       console.log("STEP_SEND_BEFORE", text);
 
-      await liff.sendMessages([
-        { type: "text", text }
-      ]);
+      const inClient = typeof liff.isInClient === "function" ? liff.isInClient() : false;
+      const canSendMessages =
+        inClient &&
+        typeof liff.sendMessages === "function" &&
+        (typeof liff.isApiAvailable !== "function" || liff.isApiAvailable("sendMessages"));
 
-      console.log("STEP_SEND_DONE");
+      if (canSendMessages) {
+        await liff.sendMessages([
+          { type: "text", text }
+        ]);
+        console.log("STEP_SEND_DONE");
+      } else {
+        let lineUserId = null;
+        let idToken = null;
+        let accessToken = null;
+        try {
+          if (typeof liff.getProfile === "function") {
+            const profile = await liff.getProfile();
+            lineUserId = profile?.userId || null;
+          }
+        } catch (_) {
+          /* ignore */
+        }
+        try {
+          if (typeof liff.getIDToken === "function") idToken = liff.getIDToken();
+        } catch (_) {
+          /* ignore */
+        }
+        try {
+          if (typeof liff.getAccessToken === "function") accessToken = liff.getAccessToken();
+        } catch (_) {
+          /* ignore */
+        }
+
+        const body = { resultType: text };
+        if (lineUserId) body.lineUserId = lineUserId;
+        if (idToken) body.idToken = idToken;
+        if (accessToken) body.accessToken = accessToken;
+
+        const origin = typeof window !== "undefined" ? window.location.origin : "";
+        const res = await fetch(`${origin}/api/line/push-result`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        });
+        const raw = await res.text();
+        let data = {};
+        try {
+          data = JSON.parse(raw);
+        } catch (_) {
+          data = {};
+        }
+        if (!res.ok || data.failure === true || data.success === false) {
+          throw new Error(typeof data.detail === "string" ? data.detail : `push-result failed: ${res.status}`);
+        }
+        console.log("STEP_PUSH_RESULT_DONE");
+      }
 
       if (typeof liff.closeWindow === "function") {
         liff.closeWindow();
