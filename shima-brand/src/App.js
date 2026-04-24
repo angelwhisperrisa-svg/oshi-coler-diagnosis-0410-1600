@@ -246,10 +246,20 @@ function clearStoredOshiType() {
 }
 
 /** 回答スコアのみで判定。同点時は固定の優先順（URLには依存しない） */
-function computeResultFromScores(sc) {
-  const max = Math.max(...RESULT_TYPE_KEYS.map((k) => sc[k] || 0));
-  const tops = RESULT_TYPE_KEYS.filter((k) => sc[k] === max);
+function computeResultFromScores(sc = {}) {
+  const normalized = {
+    mint: Number(sc.mint ?? 0),
+    rose: Number(sc.rose ?? 0),
+    lavender: Number(sc.lavender ?? 0),
+    ivory: Number(sc.ivory ?? 0),
+    skyblue: Number(sc.skyblue ?? 0)
+  };
+
+  const max = Math.max(...RESULT_TYPE_KEYS.map((k) => normalized[k]));
+  const tops = RESULT_TYPE_KEYS.filter((k) => normalized[k] === max);
+
   if (tops.length === 1) return tops[0];
+
   const tieOrder = ["mint", "rose", "lavender", "ivory", "skyblue"];
   return tieOrder.find((k) => tops.includes(k)) || tops[0];
 }
@@ -475,7 +485,15 @@ https://kaorinkobo.base.shop`,
   }
 };
 
-const initialScores = { lavender: 0, skyblue: 0, mint: 0, rose: 0, ivory: 0 };
+function createInitialScores() {
+  return {
+    mint: 0,
+    rose: 0,
+    lavender: 0,
+    ivory: 0,
+    skyblue: 0
+  };
+}
 const petals = ["🌸", "🌺", "🌷", "💮", "🌸", "🌺"];
 const butterflies = ["🦋", "🦋", "🦋"];
 const petalLanes = [4, 12, 20, 80, 88, 96];
@@ -1653,6 +1671,10 @@ function LinePage() {
   const goQuestion = () => {
     try {
       if (typeof window !== "undefined") {
+        try {
+          localStorage.removeItem(OSHI_RESULT_STORAGE_KEY);
+          sessionStorage.removeItem(PENDING_LINE_SEND_KEY);
+        } catch (_) {}
         window.sessionStorage.setItem(LINE_GATE_SESSION_KEY, "1");
       }
     } catch (_) {
@@ -1958,12 +1980,17 @@ function QuestionPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [currentQ, setCurrentQ] = useState(0);
-  const [scores, setScores] = useState(initialScores);
+  const [scores, setScores] = useState(createInitialScores());
   /** レインボー説明 / 7問 / 集計動画のみ（女神用フェーズ名は GoddessPage のみ） */
   const [phase, setPhase] = useState(QUESTION_PHASE_INTRO);
   const resultKeyRef = useRef("");
   const [resultModeFull] = useState(false);
   const finalVideoRef = useRef(null);
+
+  useEffect(() => {
+    clearStoredOshiType();
+    setScores(createInitialScores());
+  }, []);
 
   useLayoutEffect(() => {
     if (typeof window !== "undefined") {
@@ -1981,13 +2008,13 @@ function QuestionPage() {
     if (step === QUESTION_PHASE_QUIZ) {
       setPhase(QUESTION_PHASE_QUIZ);
       setCurrentQ(0);
-      setScores(initialScores);
+      setScores(createInitialScores());
       resultKeyRef.current = "";
       return;
     }
     setPhase(QUESTION_PHASE_INTRO);
     setCurrentQ(0);
-    setScores(initialScores);
+    setScores(createInitialScores());
     resultKeyRef.current = "";
   }, [navigate, searchParams]);
 
@@ -2010,18 +2037,39 @@ function QuestionPage() {
     if (p && typeof p.catch === "function") p.catch(() => {});
   }, [phase]);
 
-  const selectChoice = (scoreMap) => {
-    const nextScores = { ...scores };
+  const selectChoice = (choice) => {
+    const scoreMap = choice?.scores || {};
+
+    console.log("[QUIZ] selected choice:", choice);
+    console.log("[QUIZ] before scores:", scores);
+
+    const nextScores = {
+      mint: Number(scores?.mint ?? 0),
+      rose: Number(scores?.rose ?? 0),
+      lavender: Number(scores?.lavender ?? 0),
+      ivory: Number(scores?.ivory ?? 0),
+      skyblue: Number(scores?.skyblue ?? 0)
+    };
+
     Object.entries(scoreMap).forEach(([k, v]) => {
-      nextScores[k] += v;
+      nextScores[k] = Number(nextScores[k] ?? 0) + Number(v ?? 0);
     });
-    const nextQ = currentQ + 1;
+
+    console.log("[QUIZ] next scores:", nextScores);
+
     setScores(nextScores);
+
+    const nextQ = currentQ + 1;
     if (nextQ < questions.length) {
       setCurrentQ(nextQ);
       return;
     }
+    console.log("[RESULT] final scores:", nextScores);
+
     const topResultKey = computeResultFromScores(nextScores);
+    console.log("[RESULT] computed:", topResultKey);
+
+    writeStoredOshiType(topResultKey);
     resultKeyRef.current = topResultKey;
     setPhase(QUESTION_PHASE_CALCULATING);
   };
@@ -2150,7 +2198,7 @@ function QuestionPage() {
                         key={`${choice.text}-${idx}`}
                         type="button"
                         className="choice-btn"
-                        onClick={() => selectChoice(choice.scores)}
+                        onClick={() => selectChoice(choice)}
                       >
                         <span className="choice-icon">{choice.icon}</span>
                         <span>{choice.text}</span>
