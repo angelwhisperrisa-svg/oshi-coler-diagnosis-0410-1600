@@ -1652,8 +1652,6 @@ function RouteRedirects() {
 
 /** /line：友だち追加 QR のみ → 診断へ（/question はゲート必須） */
 function LinePage() {
-  const navigate = useNavigate();
-
   useEffect(() => {
     console.log("LINE_PAGE_RENDER");
   }, []);
@@ -1668,69 +1666,15 @@ function LinePage() {
     }
   }, []);
 
-  const goQuestion = () => {
-    try {
-      if (typeof window !== "undefined") {
-        try {
-          localStorage.removeItem(OSHI_RESULT_STORAGE_KEY);
-          sessionStorage.removeItem(PENDING_LINE_SEND_KEY);
-        } catch (_) {}
-        window.sessionStorage.setItem(LINE_GATE_SESSION_KEY, "1");
-      }
-    } catch (_) {
-      /* ignore */
-    }
-    navigate("/question", { replace: true });
-  };
   return (
-    <div className="page">
-      <div className="float-layer-back">
-        {petals.map((p, idx) => (
-          <span
-            key={`lp-${idx}`}
-            className="float-item petal"
-            style={{
-              left: `${petalLanes[idx % petalLanes.length]}%`,
-              animationDuration: `${11 + idx * 1.8}s`,
-              animationDelay: `${idx * 1.1}s`,
-              opacity: 0.17,
-              transform: "scale(0.92)"
-            }}
-          >
-            {p}
-          </span>
-        ))}
-        {butterflies.map((b, idx) => (
-          <span
-            key={`lb-${idx}`}
-            className="float-item butterfly"
-            style={{
-              left: `${butterflyLanes[idx % butterflyLanes.length]}%`,
-              top: `${idx % 2 === 0 ? 10 : 78}%`,
-              animationDuration: `${8 + idx * 2.2}s`,
-              animationDelay: `${idx * 1.4}s`,
-              opacity: 0.15,
-              transform: "scale(0.9)"
-            }}
-          >
-            {b}
-          </span>
-        ))}
-      </div>
-      <main className="container">
-        <header className="header">
-          <div className="sub">✦ Color Diagnosis ✦</div>
-          <h1 className="title">推し活💜推し色占い</h1>
-          <p className="desc">公式LINEの友だち追加のうえ、診断へお進みください。</p>
-        </header>
-        <section className="card start-screen">
+    <div className="line-page">
+      <main className="line-page-main">
+        <section className="line-card">
+          <h2>公式LINEで友だち追加</h2>
+          <p>
+            公式LINEの友だち追加後、LINEトーク内のご案内から診断へお進みください。
+          </p>
           <LineOfficialFriendBlock />
-          <button type="button" className="choice-btn diagnosis-quiz-start line-page-start-btn" onClick={goQuestion}>
-            <span className="choice-icon" aria-hidden>
-              ✨
-            </span>
-            <span>診断を始める</span>
-          </button>
         </section>
       </main>
     </div>
@@ -1961,9 +1905,6 @@ function GoddessPage() {
           <div className="welcome-overlay welcome-overlay--dual">
             <button type="button" className="welcome-glass-btn" onClick={handleWelcomeSoundOn}>
               音声をオンにする
-            </button>
-            <button type="button" className="welcome-glass-btn" onClick={beginDiagnosisQuiz}>
-              診断する
             </button>
             <button type="button" className="welcome-line-btn" onClick={beginDiagnosisQuiz}>
               推し色診断を始める
