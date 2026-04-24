@@ -19,6 +19,177 @@ const BASE_FULL_URL = process.env.REACT_APP_BASE_FULL_URL || "https://thebase.in
 const LINE_OFFICIAL_FRIEND_URL = "https://line.me/R/ti/p/@877xrsvw";
 /** /question へ入る前に必ず通過（LinePage の「診断を始める」でセット。直打ちは /line へ戻す） */
 const LINE_GATE_SESSION_KEY = "oshi_line_gate_ok_v1";
+const LIFF_ID = process.env.REACT_APP_LIFF_ID || "2009787218-kjVGGHUD";
+
+/** decodeURIComponent を数回まで安全に試す */
+function decodeURIComponentLoose(value, maxDepth = 3) {
+  let current = String(value || "");
+  for (let i = 0; i < maxDepth; i += 1) {
+    try {
+      const next = decodeURIComponent(current);
+      if (next === current) break;
+      current = next;
+    } catch (_) {
+      break;
+    }
+  }
+  return current;
+}
+
+function normalizeLiffBootTarget(raw) {
+  if (!raw) return null;
+
+  let value = decodeURIComponentLoose(String(raw).trim());
+  if (!value) return null;
+
+  // LIFF の state が "#/question" 形式のことがある
+  if (value.startsWith("#/")) value = value.slice(1);
+
+  // "?type=rose" だけ来たときは result ではなく question 導線で使うことが多いので、
+  // 無理に解釈せず、そのまま question にぶら下げる
+  if (value.startsWith("?")) value = `/question${value}`;
+
+  try {
+    const baseOrigin =
+      typeof window !== "undefined" && window.location?.origin
+        ? window.location.origin
+        : "https://example.com";
+
+    const u = new URL(value, baseOrigin);
+
+    // フルURLでも相対パスでも pathname/search/hash に正規化
+    value = `${u.pathname}${u.search}${u.hash}`;
+  } catch (_) {
+    // URL として解釈できない場合はそのまま続行
+  }
+
+  // "question", "result?type=rose" みたいな先頭スラッシュなしも許容
+  if (!value.startsWith("/")) {
+    if (/^(question|result|line|start)([/?#]|$)/i.test(value)) {
+      value = `/${value}`;
+    } else {
+      return null;
+    }
+  }
+
+  const hashIndex = value.indexOf("#");
+  const hash = hashIndex >= 0 ? value.slice(hashIndex) : "";
+  const pathAndQuery = hashIndex >= 0 ? value.slice(0, hashIndex) : value;
+
+  const queryIndex = pathAndQuery.indexOf("?");
+  const pathnameRaw = queryIndex >= 0 ? pathAndQuery.slice(0, queryIndex) : pathAndQuery;
+  const query = queryIndex >= 0 ? pathAndQuery.slice(queryIndex) : "";
+
+  const pathname = pathnameRaw.replace(/\/+$/, "") || "/";
+
+  const allowed =
+    pathname === "/" ||
+    pathname === "/start" ||
+    pathname === "/line" ||
+    pathname === "/question" ||
+    pathname === "/result" ||
+    pathname.endsWith("/result");
+
+  if (!allowed) return null;
+
+  return `${pathname}${query}${hash}`;
+}
+
+function LiffBootstrap() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const bootKeyRef = useRef("");
+
+  useLayoutEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    let alive = true;
+
+    const safeSetLineGate = () => {
+      try {
+        window.sessionStorage.setItem(LINE_GATE_SESSION_KEY, "1");
+      } catch (_) {
+        /* ignore */
+      }
+    };
+
+    async function boot() {
+      const currentRaw = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+
+      // 同じURLでの二重初期化を避ける
+      if (bootKeyRef.current === currentRaw) return;
+      bootKeyRef.current = currentRaw;
+
+      try {
+        await liff.init({ liffId: LIFF_ID });
+        if (!alive) return;
+        console.log("[LIFF_BOOT] init ok:", currentRaw);
+      } catch (error) {
+        console.error("[LIFF_BOOT] init failed:", error);
+        return;
+      }
+
+      if (!alive) return;
+
+      const params = new URLSearchParams(window.location.search || "");
+
+      // LIFF 経由の deep link 候補を広めに拾う
+      const stateRaw =
+        params.get("liff.state") ||
+        params.get("state") ||
+        "";
+
+      const currentNormalized =
+        normalizeLiffBootTarget(currentRaw) ||
+        normalizeLiffBootTarget(`${window.location.pathname}${window.location.search}`) ||
+        "/";
+
+      const stateNormalized = normalizeLiffBootTarget(stateRaw);
+      const target = stateNormalized || currentNormalized || "/";
+
+      const currentPath =
+        (window.location.pathname || "/").replace(/\/+$/, "") || "/";
+      const targetPath =
+        (target.split("?")[0] || "/").replace(/\/+$/, "") || "/";
+
+      console.log("[LIFF_BOOT] state:", stateRaw || "(none)");
+      console.log("[LIFF_BOOT] current:", currentNormalized);
+      console.log("[LIFF_BOOT] target:", target);
+
+      // question に入る前に gate を立てる
+      if (currentPath === "/question" || targetPath === "/question") {
+        safeSetLineGate();
+      }
+
+      // ルート/スタートに着地したが LIFF state に本来の遷移先がある場合
+      const shouldNavigateFromRoot =
+        !!stateNormalized && (currentPath === "/" || currentPath === "/start");
+
+      // URL と state がズレている場合も補正
+      const shouldNormalizePath =
+        !!stateNormalized && currentNormalized !== stateNormalized;
+
+      if (shouldNavigateFromRoot || shouldNormalizePath) {
+        console.log("[LIFF_BOOT] navigate:", target);
+        navigate(target, { replace: true });
+        return;
+      }
+
+      // すでに /question に居る場合でも gate だけは保証
+      if (currentPath === "/question") {
+        safeSetLineGate();
+      }
+    }
+
+    boot();
+
+    return () => {
+      alive = false;
+    };
+  }, [location.pathname, location.search, location.hash, navigate]);
+
+  return null;
+}
 
 const RESULT_TYPE_KEYS = ["mint", "rose", "lavender", "ivory", "skyblue"];
 /** LIFF ログイン遷移後の再開用セッションキー（レガシー互換・RouteRedirects で参照） */
@@ -2047,88 +2218,146 @@ function ResultPage() {
   }, [normalizedTypeKey]);
 
   async function handleLineSend(ev) {
-    console.log("HANDLE_LINE_SEND_V4");
+    console.log("[RESULT] handleLineSend:start");
 
     if (ev?.preventDefault) ev.preventDefault();
     if (ev?.stopPropagation) ev.stopPropagation();
 
     try {
-      await liff.init({
-        liffId: "2009787218-kjVGGHUD"
-      });
-
       const text = (resultKey || "").trim();
       if (!text) {
         alert("診断結果キーが見つかりませんでした");
         return;
       }
 
-      console.log("STEP_SEND_BEFORE", text);
+      await liff.init({
+        liffId: LIFF_ID
+      });
 
       const inClient = typeof liff.isInClient === "function" ? liff.isInClient() : false;
+      const loggedIn = typeof liff.isLoggedIn === "function" ? liff.isLoggedIn() : false;
+
+      console.log("[RESULT] liff context:", {
+        inClient,
+        loggedIn,
+        href: typeof window !== "undefined" ? window.location.href : ""
+      });
+
+      // 外部ブラウザで未ログインなら先にログイン
+      if (!inClient && !loggedIn && typeof liff.login === "function") {
+        try {
+          if (typeof window !== "undefined") {
+            window.sessionStorage.setItem(PENDING_LINE_SEND_KEY, text);
+            window.sessionStorage.setItem(LIFF_LOGIN_STARTED_KEY, "1");
+          }
+        } catch (_) {
+          /* ignore */
+        }
+
+        console.log("[RESULT] liff.login redirect");
+        liff.login({ redirectUri: window.location.href });
+        return;
+      }
+
       const canSendMessages =
         inClient &&
         typeof liff.sendMessages === "function" &&
         (typeof liff.isApiAvailable !== "function" || liff.isApiAvailable("sendMessages"));
 
+      console.log("[RESULT] canSendMessages:", canSendMessages);
+
+      // 1) LIFF内なら sendMessages を優先
       if (canSendMessages) {
+        const payloadText = `color=${text}`;
+        console.log("[RESULT] sendMessages payload:", payloadText);
+
         await liff.sendMessages([
-          { type: "text", text }
+          { type: "text", text: payloadText }
         ]);
-        console.log("STEP_SEND_DONE");
+
+        console.log("[RESULT] sendMessages done");
       } else {
+        // 2) だめなら backend fallback
         let lineUserId = null;
         let idToken = null;
         let accessToken = null;
+
         try {
           if (typeof liff.getProfile === "function") {
             const profile = await liff.getProfile();
             lineUserId = profile?.userId || null;
           }
-        } catch (_) {
-          /* ignore */
-        }
-        try {
-          if (typeof liff.getIDToken === "function") idToken = liff.getIDToken();
-        } catch (_) {
-          /* ignore */
-        }
-        try {
-          if (typeof liff.getAccessToken === "function") accessToken = liff.getAccessToken();
-        } catch (_) {
-          /* ignore */
+        } catch (e) {
+          console.log("[RESULT] getProfile error:", e?.message || e);
         }
 
-        const body = { resultType: text };
-        if (lineUserId) body.lineUserId = lineUserId;
-        if (idToken) body.idToken = idToken;
-        if (accessToken) body.accessToken = accessToken;
+        try {
+          if (typeof liff.getIDToken === "function") {
+            idToken = liff.getIDToken();
+          }
+        } catch (e) {
+          console.log("[RESULT] getIDToken error:", e?.message || e);
+        }
+
+        try {
+          if (typeof liff.getAccessToken === "function") {
+            accessToken = liff.getAccessToken();
+          }
+        } catch (e) {
+          console.log("[RESULT] getAccessToken error:", e?.message || e);
+        }
+
+        console.log("[RESULT] fallback identity:", {
+          hasLineUserId: !!lineUserId,
+          hasIdToken: !!idToken,
+          hasAccessToken: !!accessToken
+        });
 
         const origin = typeof window !== "undefined" ? window.location.origin : "";
         const res = await fetch(`${origin}/api/line/push-result`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body)
+          body: JSON.stringify({
+            resultType: `color=${text}`,
+            lineUserId,
+            idToken,
+            accessToken
+          })
         });
-        const raw = await res.text();
+
+        const raw = await res.text().catch(() => "");
         let data = {};
         try {
           data = JSON.parse(raw);
         } catch (_) {
           data = {};
         }
+
+        console.log("[RESULT] push-result response:", {
+          status: res.status,
+          body: data
+        });
+
         if (!res.ok || data.failure === true || data.success === false) {
           throw new Error(typeof data.detail === "string" ? data.detail : `push-result failed: ${res.status}`);
         }
-        console.log("STEP_PUSH_RESULT_DONE");
       }
 
-      if (typeof liff.closeWindow === "function") {
+      try {
+        if (typeof window !== "undefined") {
+          window.sessionStorage.removeItem(PENDING_LINE_SEND_KEY);
+          window.sessionStorage.removeItem(LIFF_LOGIN_STARTED_KEY);
+        }
+      } catch (_) {
+        /* ignore */
+      }
+
+      if (typeof liff.closeWindow === "function" && inClient) {
         liff.closeWindow();
       }
 
     } catch (e) {
-      console.error("HANDLE_LINE_SEND_V4_ERROR", e);
+      console.error("[RESULT] handleLineSend error:", e);
       alert("送信に失敗しました");
     }
   }
@@ -2150,7 +2379,11 @@ function ResultPage() {
   const renderLineContinueBlock = () => (
     <div className="result-line-next-wrap">
       <p className="result-line-next-copy">{RESULT_LINE_NEXT_COPY}</p>
-      <button onClick={handleLineSend}>
+      <button
+        type="button"
+        className="result-line-next-btn"
+        onClick={handleLineSend}
+      >
         LINEで続きを受け取る
       </button>
     </div>
@@ -2331,6 +2564,7 @@ export default function App() {
   return (
     <>
       <style>{styles}</style>
+      <LiffBootstrap />
       <RouteRedirects />
       <Routes>
         <Route path="/" element={<GoddessPage />} />
